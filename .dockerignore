@@ -1,0 +1,16 @@
+node_modules
+.env
+dist
+.next
+coverage
+tmp
+.git
+.turbo
+.idea
+.vscode
+**/*.log
+storage
+
+# Ignore environment secrets
+.env
+.env.*

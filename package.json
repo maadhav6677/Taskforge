@@ -1,0 +1,36 @@
+{
+  "name": "taskforge",
+  "private": true,
+  "packageManager": "pnpm@10.12.1",
+  "version": "0.0.0",
+  "engines": {
+    "node": "24.x",
+    "pnpm": ">=10.10.0"
+  },
+  "scripts": {
+    "lint": "pnpm -r lint",
+    "lint:fix": "pnpm -r lint:fix",
+    "format": "prettier --cache --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "build": "pnpm -r build",
+    "ci:check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build",
+    "start:api": "pnpm --filter @taskforge/api start",
+    "start:web": "pnpm --filter @taskforge/web dev",
+    "start:worker": "pnpm --filter @taskforge/api start:worker",
+    "start:stack": "docker compose up --build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.32.0",
+    "@types/jest": "^29.5.14",
+    "@typescript-eslint/eslint-plugin": "^8.22.0",
+    "@typescript-eslint/parser": "^8.22.0",
+    "eslint": "^9.32.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.5.4",
+    "ts-jest": "^29.2.7",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.2"
+  }
+}

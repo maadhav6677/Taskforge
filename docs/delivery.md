@@ -1,12 +1,10 @@
 # Delivery plan
 
-**Status:** Active; Phase 0 complete, implementation not started
+**Status:** Active; Phase 1 baseline scaffolded, implementation phase 2 not started
 
 ## Strategy
 
 Build one verified vertical capability at a time and keep milestone commits runnable. Prove backend/domain behavior before frontend polish depends on it. Start bonus work only after mandatory behavior is secure, tested, documented, and reproducible.
-
-Target 50–60 active hours within the 72-hour assessment window, preserving integration, documentation, video, and submission buffer.
 
 ## Priorities
 

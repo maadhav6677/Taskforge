@@ -1,0 +1,67 @@
+services:
+  redis:
+    image: redis:7.2-alpine
+    container_name: taskforge-redis
+    command: redis-server --appendonly yes --save 60 1 --maxmemory-policy noeviction
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  postgres:
+    image: postgres:18-alpine
+    container_name: taskforge-postgres
+    environment:
+      POSTGRES_USER: taskforge
+      POSTGRES_PASSWORD: taskforge
+      POSTGRES_DB: taskforge
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: taskforge-api
+    depends_on:
+      - postgres
+      - redis
+    env_file:
+      - .env.example
+    ports:
+      - "4000:4000"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:4000/api/v1/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile.worker
+    container_name: taskforge-worker
+    depends_on:
+      - postgres
+      - redis
+      - api
+    env_file:
+      - .env.example
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: taskforge-web
+    depends_on:
+      - api
+    env_file:
+      - .env.example
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres-data:
+  redis-data:
