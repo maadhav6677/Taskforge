@@ -1,6 +1,21 @@
-# Local long-form planning drafts. Keep these files on disk, but use the
-# tracked documents in docs/ as the repository source of truth.
+# Local long-form planning drafts. not using these docs/ as the repository source of truth.
 docs/assessment-requirements.md
 docs/implementation-plan.md
 docs/product-blueprint.md
 docs/roadmap.md
+
+# Build and dependency artifacts
+node_modules/
+dist/
+.next/
+coverage/
+pnpm-debug.log*
+*.pem
+
+# Environment and runtime
+.env
+.DS_Store
+
+# Storage and temporary files
+storage/
+tmp/
