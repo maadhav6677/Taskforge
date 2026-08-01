@@ -1,0 +1,6 @@
+# Local long-form planning drafts. Keep these files on disk, but use the
+# tracked documents in docs/ as the repository source of truth.
+docs/assessment-requirements.md
+docs/implementation-plan.md
+docs/product-blueprint.md
+docs/roadmap.md
