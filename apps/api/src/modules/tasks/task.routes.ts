@@ -19,7 +19,13 @@ import {
 
 const taskIdSchema = z.object({ id: z.string().uuid() });
 const taskStatuses = ['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED'] as const;
-const textInputSchema = z.object({ text: z.string().min(1).max(2_000) }).strict();
+const textInputSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    text: z.string().min(1).max(2_000),
+  })
+  .strict();
+const fileInspectionInputSchema = z.object({ schemaVersion: z.literal(1) }).strict();
 const createSchema = z
   .discriminatedUnion('type', [
     z
@@ -37,7 +43,7 @@ const createSchema = z
         title: z.string().trim().min(1).max(160),
         description: z.string().trim().max(2_000).optional(),
         type: z.literal('FILE_INSPECTION'),
-        input: z.object({}).strict().default({}),
+        input: fileInspectionInputSchema.default({ schemaVersion: 1 }),
         scheduledAt: z.string().datetime({ offset: true }).optional(),
         maxAttempts: z.number().int().min(1).max(5).default(3),
       })
@@ -247,9 +253,19 @@ export const createTaskRouter = () => {
     const { id } = taskIdSchema.parse(req.params);
     const task = await repository.findOwnedById(req.auth!.sub, id);
     if (!task) throw new HttpError(404, 'TASK_NOT_FOUND', 'The task was not found.');
-    res
-      .set('ETag', `"${task.version}"`)
-      .json(toSuccessResponse(req, { task: serializeTask(task) }));
+    const attachments = await fileRepository.listForTask(task.id);
+    res.set('ETag', `"${task.version}"`).json(
+      toSuccessResponse(req, {
+        task: serializeTask(task),
+        attachments: attachments.map((file) => ({
+          id: file.id,
+          originalName: file.originalName,
+          mimeType: file.mimeType,
+          sizeBytes: Number(file.sizeBytes),
+          sha256: file.sha256,
+        })),
+      }),
+    );
   });
 
   router.patch('/:id', async (req, res) => {

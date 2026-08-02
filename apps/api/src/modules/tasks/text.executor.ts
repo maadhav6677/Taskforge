@@ -2,7 +2,12 @@ import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import type { JsonObject } from './task.repository.js';
 
-const inputSchema = z.object({ text: z.string().min(1).max(2_000) }).strict();
+const inputSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    text: z.string().min(1).max(2_000),
+  })
+  .strict();
 
 export class TextExecutionError extends Error {}
 
@@ -13,6 +18,7 @@ export const executeTextTask = (input: unknown): JsonObject => {
   }
   const normalized = text.trim().replace(/\s+/g, ' ');
   return {
+    schemaVersion: 1,
     normalized,
     uppercase: normalized.toUpperCase(),
     wordCount: normalized ? normalized.split(' ').length : 0,
