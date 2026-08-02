@@ -11,6 +11,27 @@ import { TaskRepository } from './task.repository.js';
 import { executeTextTask } from './text.executor.js';
 import { FileRepository } from '../files/file.repository.js';
 import { FileStorage } from '../files/file.storage.js';
+import { redis } from '../../infrastructure/redis/redis.js';
+import { TaskSummaryCache } from '../../infrastructure/cache/task-summary.cache.js';
+import { publishTaskStatus } from '../../infrastructure/realtime/task-events.js';
+
+const emitTaskStatus = async (
+  ownerId: string,
+  taskId: string,
+  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED',
+  executionVersion: number,
+): Promise<void> => {
+  await Promise.allSettled([
+    new TaskSummaryCache(redis).invalidate(ownerId),
+    publishTaskStatus(redis, {
+      ownerId,
+      taskId,
+      status,
+      executionVersion,
+      occurredAt: new Date().toISOString(),
+    }),
+  ]);
+};
 
 export const createTaskWorker = (tasks = new TaskRepository(prisma)) =>
   new Worker<TaskJob>(
@@ -25,6 +46,7 @@ export const createTaskWorker = (tasks = new TaskRepository(prisma)) =>
         new Date(),
       );
       if (!task) return { skipped: true };
+      await emitTaskStatus(task.ownerId, task.id, 'PROCESSING', task.executionVersion);
 
       try {
         let result;
@@ -48,6 +70,7 @@ export const createTaskWorker = (tasks = new TaskRepository(prisma)) =>
           result = { files: inspected };
         }
         await tasks.completeProcessing(task.id, task.executionVersion, result, new Date());
+        await emitTaskStatus(task.ownerId, task.id, 'COMPLETED', task.executionVersion);
         return result;
       } catch (error) {
         const retryable = attempt < task.maxAttempts;
@@ -59,6 +82,12 @@ export const createTaskWorker = (tasks = new TaskRepository(prisma)) =>
           'TASK_EXECUTION_FAILED',
           'Task execution failed.',
           new Date(),
+        );
+        await emitTaskStatus(
+          task.ownerId,
+          task.id,
+          retryable ? 'PENDING' : 'FAILED',
+          task.executionVersion,
         );
         throw error;
       }

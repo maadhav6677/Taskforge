@@ -5,6 +5,8 @@ import { toSuccessResponse } from '../../shared/http.js';
 import { authenticate, requireRole } from '../auth/auth.middleware.js';
 import { TaskRepository } from '../tasks/task.repository.js';
 import { serializeTask } from '../tasks/task.routes.js';
+import { redis } from '../../infrastructure/redis/redis.js';
+import { TaskSummaryCache } from '../../infrastructure/cache/task-summary.cache.js';
 
 const paginationSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -14,9 +16,11 @@ const paginationSchema = z.object({
 export const createAdminRouter = () => {
   const router = Router();
   const tasks = new TaskRepository(prisma);
+  const cache = new TaskSummaryCache(redis);
   router.use(authenticate, requireRole('ADMIN'));
   router.get('/dashboard/summary', async (req, res) => {
-    const counts = await tasks.getStatusCounts();
+    const counts = (await cache.get()) ?? (await tasks.getStatusCounts());
+    await cache.set(counts);
     res.json(toSuccessResponse(req, { counts }));
   });
   router.get('/tasks', async (req, res) => {

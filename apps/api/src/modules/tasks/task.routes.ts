@@ -7,6 +7,8 @@ import { HttpError, toSuccessResponse } from '../../shared/http.js';
 import { authenticate, requireRole } from '../auth/auth.middleware.js';
 import { FileRepository } from '../files/file.repository.js';
 import { FileStorage, UnsupportedFileTypeError } from '../files/file.storage.js';
+import { redis } from '../../infrastructure/redis/redis.js';
+import { TaskSummaryCache } from '../../infrastructure/cache/task-summary.cache.js';
 import { TaskDispatcher } from './task.dispatcher.js';
 import type { TaskEventRecord, TaskRecord } from './task.repository.js';
 import { TaskRepository } from './task.repository.js';
@@ -135,6 +137,7 @@ export const createTaskRouter = () => {
   const service = new TaskService(repository, new TaskDispatcher(repository));
   const fileRepository = new FileRepository(prisma);
   const storage = new FileStorage();
+  const summaryCache = new TaskSummaryCache(redis);
   const upload = multer({
     storage: multer.memoryStorage(),
     limits: { files: env.TASK_MAX_FILES, fileSize: env.TASK_MAX_FILE_SIZE_BYTES },
@@ -183,6 +186,7 @@ export const createTaskRouter = () => {
       },
       input.type === 'TEXT_PROCESSING',
     );
+    await summaryCache.invalidate(req.auth!.sub);
     const storedKeys: string[] = [];
     const attachments = [];
     try {
@@ -285,6 +289,7 @@ export const createTaskRouter = () => {
             : {}),
         },
       );
+      await summaryCache.invalidate(req.auth!.sub);
       res
         .set('ETag', `"${task.version}"`)
         .json(toSuccessResponse(req, { task: serializeTask(task) }));
@@ -297,6 +302,7 @@ export const createTaskRouter = () => {
     const { id } = taskIdSchema.parse(req.params);
     try {
       await service.remove(req.auth!.sub, id, parseExpectedVersion(req.get('if-match')));
+      await summaryCache.invalidate(req.auth!.sub);
       res.status(204).end();
     } catch (error) {
       translateTaskError(error);
@@ -311,6 +317,7 @@ export const createTaskRouter = () => {
         id,
         parseExpectedVersion(req.get('if-match')),
       );
+      await summaryCache.invalidate(req.auth!.sub);
       res.status(202).json(toSuccessResponse(req, { task: serializeTask(task) }));
     } catch (error) {
       translateTaskError(error);
