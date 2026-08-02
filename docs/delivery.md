@@ -1,6 +1,6 @@
 # Delivery plan
 
-**Status:** Active; Phase 1 baseline scaffolded, implementation phase 2 not started
+**Status:** Active; Phase 1 complete, Phase 2 not started
 
 ## Strategy
 
