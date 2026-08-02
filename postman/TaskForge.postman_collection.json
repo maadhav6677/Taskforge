@@ -68,7 +68,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"title\": \"Postman smoke task\",\n  \"description\": \"Created through the verified collection\",\n  \"type\": \"TEXT_PROCESSING\",\n  \"input\": { \"text\": \"TaskForge keeps asynchronous state truthful.\" },\n  \"maxAttempts\": 3\n}"
+          "raw": "{\n  \"title\": \"Postman smoke task\",\n  \"description\": \"Created through the verified collection\",\n  \"type\": \"TEXT_PROCESSING\",\n  \"input\": { \"schemaVersion\": 1, \"text\": \"TaskForge keeps asynchronous state truthful.\" },\n  \"maxAttempts\": 3\n}"
         },
         "url": "{{baseUrl}}{{apiBase}}/tasks"
       },

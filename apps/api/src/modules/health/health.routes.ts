@@ -1,10 +1,12 @@
 import { Router } from 'express';
+import swaggerUi from 'swagger-ui-express';
 import { healthSuccess } from '../../shared/contract.js';
 import { toErrorResponse, toSuccessResponse } from '../../shared/http.js';
 import type { Request, Response } from 'express';
 import { prisma } from '../../infrastructure/database/prisma.js';
 import { redis } from '../../infrastructure/redis/redis.js';
 import { env } from '../../config/env.js';
+import { openApiDocument } from '../../openapi/openapi.js';
 
 const withTimeout = async <T>(operation: Promise<T>): Promise<T> => {
   let timeout: NodeJS.Timeout | undefined;
@@ -57,24 +59,10 @@ export const createHealthRouter = () => {
       );
   });
 
-  router.get('/docs', (req, res) => {
-    res.status(200).json(
-      toSuccessResponse(req, {
-        message: 'OpenAPI generation is introduced in the submission hardening phase.',
-      }),
-    );
-  });
+  router.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiDocument));
 
-  router.get('/openapi.json', (req, res) => {
-    res
-      .status(503)
-      .json(
-        toErrorResponse(
-          req,
-          'OPENAPI_NOT_AVAILABLE',
-          'OpenAPI generation is introduced in the submission hardening phase.',
-        ),
-      );
+  router.get('/openapi.json', (_req, res) => {
+    res.json(openApiDocument);
   });
 
   return router;

@@ -16,7 +16,7 @@ describe('task wire contracts', () => {
     expect(
       taskInputSchema.safeParse({
         type: 'TEXT_PROCESSING',
-        input: { text: 'Summarize this deterministic text.' },
+        input: { schemaVersion: 1, text: 'Summarize this deterministic text.' },
       }).success,
     ).toBe(true);
 

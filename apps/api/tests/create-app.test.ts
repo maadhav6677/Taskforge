@@ -68,4 +68,17 @@ describe('TaskForge API foundation', () => {
     expect(untrustedResponse.status).toBeGreaterThanOrEqual(400);
     expect(untrustedResponse.headers['access-control-allow-origin']).toBeUndefined();
   });
+
+  it('serves the committed OpenAPI document and Swagger UI', async () => {
+    const document = await request(createApp()).get('/api/v1/openapi.json').expect(200);
+    expect(document.body).toMatchObject({
+      openapi: '3.1.0',
+      info: { title: 'TaskForge API' },
+    });
+    expect(document.body.paths).toHaveProperty('/tasks');
+
+    const docs = await request(createApp()).get('/api/v1/docs/').expect(200);
+    expect(docs.headers['content-type']).toMatch(/^text\/html/);
+    expect(docs.text).toContain('swagger-ui');
+  });
 });

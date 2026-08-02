@@ -47,6 +47,9 @@ const refreshSession = (): Promise<boolean> => {
   return refreshPromise;
 };
 
+const canRefreshRequest = (path: string): boolean =>
+  path === '/auth/me' || !path.startsWith('/auth/');
+
 export const apiRequest = async <T>(
   path: string,
   init: RequestInit = {},
@@ -65,7 +68,7 @@ export const apiRequest = async <T>(
     headers,
     credentials: 'include',
   });
-  if (response.status === 401 && allowRefresh && !path.startsWith('/auth/')) {
+  if (response.status === 401 && allowRefresh && canRefreshRequest(path)) {
     if (await refreshSession()) return apiRequest<T>(path, init, false);
   }
   if (!response.ok) {
