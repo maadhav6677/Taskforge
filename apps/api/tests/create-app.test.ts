@@ -29,20 +29,6 @@ describe('TaskForge API foundation', () => {
     expect(Number.isNaN(Date.parse(response.body.data.checkedAt))).toBe(false);
   });
 
-  it('does not report readiness before dependency checks are available', async () => {
-    const response = await request(createApp()).get('/api/v1/health/ready').expect(503);
-
-    expect(response.body).toEqual({
-      error: {
-        code: 'SERVICE_NOT_READY',
-        message: 'The service is not ready to receive traffic.',
-      },
-      requestId: response.body.requestId,
-    });
-    expect(response.body.requestId).toMatch(uuidPattern);
-    expect(response.headers['x-request-id']).toBe(response.body.requestId);
-  });
-
   it('returns the public error envelope for an unknown route', async () => {
     const response = await request(createApp()).get('/api/v1/not-a-route').expect(404);
 

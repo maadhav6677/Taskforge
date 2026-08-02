@@ -1,0 +1,115 @@
+{
+  "info": {
+    "_postman_id": "bb3ace20-f99d-4ebc-82d9-e373aa3916ef",
+    "name": "TaskForge API",
+    "description": "Cookie-authenticated TaskForge smoke workflow. Run CSRF before mutations; no bearer or refresh token is stored in this collection.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4000" },
+    { "key": "apiBase", "value": "/api/v1" },
+    { "key": "csrfToken", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "01 - Establish CSRF",
+      "request": { "method": "GET", "url": "{{baseUrl}}{{apiBase}}/auth/csrf" },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('CSRF cookie issued', () => pm.response.to.have.status(204));",
+              "pm.collectionVariables.set('csrfToken', pm.cookies.get('tf_csrf') || '');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Origin", "value": "http://localhost:3000" },
+          { "key": "x-csrf-token", "value": "{{csrfToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"user@taskforge.local\",\n  \"password\": \"TaskForge123!\"\n}"
+        },
+        "url": "{{baseUrl}}{{apiBase}}/auth/login"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Authenticated', () => pm.response.to.have.status(200));",
+              "pm.collectionVariables.set('csrfToken', pm.cookies.get('tf_csrf') || pm.collectionVariables.get('csrfToken'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - Current user",
+      "request": { "method": "GET", "url": "{{baseUrl}}{{apiBase}}/auth/me" }
+    },
+    {
+      "name": "04 - Create text task",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Origin", "value": "http://localhost:3000" },
+          { "key": "x-csrf-token", "value": "{{csrfToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Postman smoke task\",\n  \"description\": \"Created through the verified collection\",\n  \"type\": \"TEXT_PROCESSING\",\n  \"input\": { \"text\": \"TaskForge keeps asynchronous state truthful.\" },\n  \"maxAttempts\": 3\n}"
+        },
+        "url": "{{baseUrl}}{{apiBase}}/tasks"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": ["pm.test('Durably accepted', () => pm.response.to.have.status(202));"]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - List owned tasks",
+      "request": { "method": "GET", "url": "{{baseUrl}}{{apiBase}}/tasks?page=1&pageSize=20" }
+    },
+    {
+      "name": "06 - Dashboard",
+      "request": { "method": "GET", "url": "{{baseUrl}}{{apiBase}}/dashboard/summary" }
+    },
+    {
+      "name": "07 - Logout",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Origin", "value": "http://localhost:3000" },
+          { "key": "x-csrf-token", "value": "{{csrfToken}}" }
+        ],
+        "url": "{{baseUrl}}{{apiBase}}/auth/logout"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Session revoked', () => pm.response.to.have.status(204));",
+              "pm.collectionVariables.set('csrfToken', '');"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

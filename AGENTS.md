@@ -10,6 +10,7 @@ Do not assume commands, dependencies, or generated artifacts exist until they ap
 
 Always read [README.md](README.md), [requirements](docs/requirements.md), and [architecture](docs/architecture.md). Then read only the relevant authority:
 
+- implemented component and flow map: [HLD/LLD](docs/system-design.md)
 - technical rationale: [decisions](docs/decisions.md)
 - endpoints and wire behavior: [API](docs/api.md)
 - persistence: [database](docs/database.md)
@@ -50,6 +51,7 @@ Update the owning document in the same change:
 | --------------------------------------- | -------------------------------------------------------- |
 | Scope or product behavior               | `docs/requirements.md`                                   |
 | Runtime/module/data flow                | `docs/architecture.md`; rationale in `docs/decisions.md` |
+| Implemented component/flow detail       | `docs/system-design.md`                                  |
 | Endpoint or error contract              | `docs/api.md` and generated OpenAPI when available       |
 | Schema, constraint, index, or migration | `docs/database.md`                                       |
 | Security control                        | `docs/security.md`                                       |

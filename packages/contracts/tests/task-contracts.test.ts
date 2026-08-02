@@ -28,13 +28,12 @@ describe('task wire contracts', () => {
     ).toBe(false);
   });
 
-  it('rejects invalid file metadata at the wire boundary', () => {
+  it('keeps file bytes and storage metadata outside versioned task input', () => {
+    expect(fileInspectionInputSchema.parse({})).toEqual({ schemaVersion: 1 });
     expect(
       fileInspectionInputSchema.safeParse({
+        schemaVersion: 2,
         storageKey: '../private/file.pdf',
-        originalFileName: 'file.pdf',
-        mimeType: 'application/pdf',
-        fileSizeBytes: 0,
       }).success,
     ).toBe(false);
   });

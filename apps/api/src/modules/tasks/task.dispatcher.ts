@@ -1,12 +1,16 @@
 import type { Queue } from 'bullmq';
-import { taskJobId, taskQueue, type TaskJob } from '../../infrastructure/queue/task.queue.js';
+import { getTaskQueue, taskJobId, type TaskJob } from '../../infrastructure/queue/task.queue.js';
 import type { TaskRecord, TaskRepository } from './task.repository.js';
 
 export class TaskDispatcher {
   public constructor(
     private readonly tasks: TaskRepository,
-    private readonly queue: Queue<TaskJob> = taskQueue,
+    private readonly providedQueue?: Queue<TaskJob>,
   ) {}
+
+  private get queue(): Queue<TaskJob> {
+    return this.providedQueue ?? getTaskQueue();
+  }
 
   public async dispatch(task: TaskRecord, now = new Date()): Promise<void> {
     const jobId = taskJobId(task.id, task.executionVersion);

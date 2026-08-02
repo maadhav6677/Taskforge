@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: taskforge
+          POSTGRES_PASSWORD: taskforge
+          POSTGRES_DB: taskforge
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U taskforge -d taskforge"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7.2-alpine
+        ports: ['6379:6379']
+    env:
+      DATABASE_URL: postgresql://taskforge:taskforge@localhost:5432/taskforge
+      DATABASE_URL_TEST: postgresql://taskforge:taskforge@localhost:5432/taskforge_test
+      REDIS_URL: redis://localhost:6379/15
+      REDIS_URL_TEST: redis://localhost:6379/15
+      JWT_ACCESS_SECRET: ci-access-secret-1234567890-abcdefghijklmnopqrstuvwxyz
+      JWT_REFRESH_SECRET: ci-refresh-secret-1234567890-abcdefghijklmnopqrstuvwxyz
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm ci:check
+      - run: pnpm test:integration:postgres
+
+  containers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose config --quiet
+      - run: docker compose build

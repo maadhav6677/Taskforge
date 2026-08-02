@@ -1,5 +1,5 @@
 import type { TaskStatus, TaskType } from '@taskforge/contracts';
-import type { Task, TaskEvent } from '../../generated/prisma/client.js';
+import type { Prisma, Task, TaskEvent } from '../../generated/prisma/client.js';
 import type { TaskforgePrismaClient } from '../../infrastructure/database/prisma.js';
 
 export type JsonValue =
@@ -61,6 +61,12 @@ export interface OwnedTaskListQuery {
   ownerId: string;
   search?: string;
   status?: TaskStatus;
+  type?: TaskType;
+  scheduled?: boolean;
+  createdFrom?: Date;
+  createdTo?: Date;
+  sortBy?: 'createdAt' | 'updatedAt' | 'scheduledAt' | 'status' | 'title';
+  sortOrder?: 'asc' | 'desc';
   offset: number;
   limit: number;
 }
@@ -118,6 +124,37 @@ const toTaskEventRecord = (event: TaskEvent): TaskEventRecord => ({
   occurredAt: event.occurredAt,
 });
 
+const ownedTaskWhere = (
+  query: Omit<OwnedTaskListQuery, 'offset' | 'limit' | 'sortBy' | 'sortOrder'>,
+): Prisma.TaskWhereInput => {
+  const search = query.search?.trim();
+  return {
+    ownerId: query.ownerId,
+    deletedAt: null,
+    ...(query.status ? { status: query.status } : {}),
+    ...(query.type ? { type: query.type } : {}),
+    ...(query.scheduled === undefined
+      ? {}
+      : { scheduledAt: query.scheduled ? { not: null } : null }),
+    ...(query.createdFrom || query.createdTo
+      ? {
+          createdAt: {
+            ...(query.createdFrom ? { gte: query.createdFrom } : {}),
+            ...(query.createdTo ? { lte: query.createdTo } : {}),
+          },
+        }
+      : {}),
+    ...(search
+      ? {
+          OR: [
+            { title: { contains: search, mode: 'insensitive' as const } },
+            { description: { contains: search, mode: 'insensitive' as const } },
+          ],
+        }
+      : {}),
+  };
+};
+
 export class TaskRepository {
   public constructor(private readonly database: TaskforgePrismaClient) {}
 
@@ -159,22 +196,12 @@ export class TaskRepository {
   }
 
   public async listOwned(query: OwnedTaskListQuery): Promise<TaskRecord[]> {
-    const search = query.search?.trim();
+    const sortBy = query.sortBy ?? 'createdAt';
+    const sortOrder = query.sortOrder ?? 'desc';
+    const primaryOrder: Prisma.TaskOrderByWithRelationInput = { [sortBy]: sortOrder };
     const tasks = await this.database.task.findMany({
-      where: {
-        ownerId: query.ownerId,
-        deletedAt: null,
-        ...(query.status ? { status: query.status } : {}),
-        ...(search
-          ? {
-              OR: [
-                { title: { contains: search, mode: 'insensitive' as const } },
-                { description: { contains: search, mode: 'insensitive' as const } },
-              ],
-            }
-          : {}),
-      },
-      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      where: ownedTaskWhere(query),
+      orderBy: [primaryOrder, { id: 'asc' }],
       skip: query.offset,
       take: query.limit,
     });
@@ -183,21 +210,8 @@ export class TaskRepository {
   }
 
   public async countOwned(query: Omit<OwnedTaskListQuery, 'offset' | 'limit'>): Promise<number> {
-    const search = query.search?.trim();
     return this.database.task.count({
-      where: {
-        ownerId: query.ownerId,
-        deletedAt: null,
-        ...(query.status ? { status: query.status } : {}),
-        ...(search
-          ? {
-              OR: [
-                { title: { contains: search, mode: 'insensitive' as const } },
-                { description: { contains: search, mode: 'insensitive' as const } },
-              ],
-            }
-          : {}),
-      },
+      where: ownedTaskWhere(query),
     });
   }
 
