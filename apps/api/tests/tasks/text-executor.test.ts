@@ -2,7 +2,8 @@ import { executeTextTask, TextExecutionError } from '../../src/modules/tasks/tex
 
 describe('text task executor', () => {
   it('returns deterministic normalized analysis', () => {
-    expect(executeTextTask({ text: '  TaskForge   stays truthful.  ' })).toEqual({
+    expect(executeTextTask({ schemaVersion: 1, text: '  TaskForge   stays truthful.  ' })).toEqual({
+      schemaVersion: 1,
       normalized: 'TaskForge stays truthful.',
       uppercase: 'TASKFORGE STAYS TRUTHFUL.',
       wordCount: 3,
@@ -12,7 +13,7 @@ describe('text task executor', () => {
   });
 
   it('rejects invalid input and exposes the deterministic failure fixture', () => {
-    expect(() => executeTextTask({ text: 'Trigger [[FAIL]] safely.' })).toThrow(TextExecutionError);
+    expect(() => executeTextTask({ schemaVersion: 1, text: 'Trigger [[FAIL]] safely.' })).toThrow(TextExecutionError);
     expect(() => executeTextTask({ text: '' })).toThrow();
   });
 });

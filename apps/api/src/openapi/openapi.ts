@@ -276,8 +276,11 @@ export const openApiDocument = {
           input: {
             type: 'object',
             additionalProperties: false,
-            required: ['text'],
-            properties: { text: { type: 'string', minLength: 1, maxLength: 2000 } },
+            required: ['schemaVersion', 'text'],
+            properties: {
+              schemaVersion: { const: 1 },
+              text: { type: 'string', minLength: 1, maxLength: 2000 },
+            },
           },
           scheduledAt: { type: 'string', format: 'date-time' },
           maxAttempts: { type: 'integer', minimum: 1, maximum: 5, default: 3 },
