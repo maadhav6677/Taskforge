@@ -16,19 +16,19 @@ Deployment is the first item dropped if reliability is uncertain.
 
 ## Phases
 
-| Phase | Outcome | Gate |
-| ---: | --- | --- |
-| 0 | Requirements, architecture, decisions, contracts | Complete |
-| 1 | pnpm workspace; Next/Express API+worker; TS/lint/test/config/log/health baseline | Root install/check/test/build works; runtimes start separately |
-| 2 | Prisma/PostgreSQL schema, constraints, indexes, migrations, seed | Empty DB migrates/seeds; repository integration tests pass |
-| 3 | Argon2id auth, access JWT, Redis refresh rotation, CSRF/CORS/RBAC | Rotation/revocation/negative authorization tests pass |
-| 4 | Task state policy, CRUD/history/list/admin REST and OpenAPI | Lifecycle, ownership, pagination, status/error contract tests pass |
-| 5 | BullMQ worker, scheduling, retries, idempotency, reconciliation | Async/delay/retry/duplicate/outage integration tests pass |
-| 6 | Private uploads and file-inspection executor | Type/size/path/ownership/cleanup tests pass |
-| 7 | Frontend auth shell and dashboard | Session, responsive, keyboard, loading/error states verified |
-| 8 | Task list/create/detail/edit/delete/retry/history UI | URL state, conflicts, all lifecycle UI states verified |
-| 9 | Bounded caches and authenticated Socket.IO hints | Scope/invalidation/outage/reconnect tests pass |
-| 10 | Full hardening, Docker, CI, OpenAPI/Postman, README, video | Clean-room setup and public submission checklist pass |
+| Phase | Outcome                                                                          | Gate                                                               |
+| ----: | -------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+|     0 | Requirements, architecture, decisions, contracts                                 | Complete                                                           |
+|     1 | pnpm workspace; Next/Express API+worker; TS/lint/test/config/log/health baseline | Root install/check/test/build works; runtimes start separately     |
+|     2 | Prisma/PostgreSQL schema, constraints, indexes, migrations, seed                 | Empty DB migrates/seeds; repository integration tests pass         |
+|     3 | Argon2id auth, access JWT, Redis refresh rotation, CSRF/CORS/RBAC                | Rotation/revocation/negative authorization tests pass              |
+|     4 | Task state policy, CRUD/history/list/admin REST and OpenAPI                      | Lifecycle, ownership, pagination, status/error contract tests pass |
+|     5 | BullMQ worker, scheduling, retries, idempotency, reconciliation                  | Async/delay/retry/duplicate/outage integration tests pass          |
+|     6 | Private uploads and file-inspection executor                                     | Type/size/path/ownership/cleanup tests pass                        |
+|     7 | Frontend auth shell and dashboard                                                | Session, responsive, keyboard, loading/error states verified       |
+|     8 | Task list/create/detail/edit/delete/retry/history UI                             | URL state, conflicts, all lifecycle UI states verified             |
+|     9 | Bounded caches and authenticated Socket.IO hints                                 | Scope/invalidation/outage/reconnect tests pass                     |
+|    10 | Full hardening, Docker, CI, OpenAPI/Postman, README, video                       | Clean-room setup and public submission checklist pass              |
 
 Update phase status here only when its gate passes. File creation alone is not completion.
 
@@ -100,16 +100,16 @@ Use fake clocks for pure time logic and bounded polling for workers; never fixed
 
 ## Primary risks
 
-| Risk | Control |
-| --- | --- |
-| Cookie/CORS deployment mismatch | Real browser-origin integration during auth phase |
-| Database/queue drift | Deterministic IDs, execution version, conditional claims, reconciliation |
-| Flaky queue tests | Injected clocks and bounded condition polling |
-| File/database divergence | Temporary storage plus compensation/cleanup |
-| Mixed Redis pressure | TTLs, bounded retention, noeviction; production split documented |
-| Duplicate browser state | Enforce Query/Redux/URL ownership |
-| Bonus scope threatens core | P0/P1 gates; drop deployment/live polish first |
-| Documentation drift | Owning doc updated in same change |
+| Risk                            | Control                                                                  |
+| ------------------------------- | ------------------------------------------------------------------------ |
+| Cookie/CORS deployment mismatch | Real browser-origin integration during auth phase                        |
+| Database/queue drift            | Deterministic IDs, execution version, conditional claims, reconciliation |
+| Flaky queue tests               | Injected clocks and bounded condition polling                            |
+| File/database divergence        | Temporary storage plus compensation/cleanup                              |
+| Mixed Redis pressure            | TTLs, bounded retention, noeviction; production split documented         |
+| Duplicate browser state         | Enforce Query/Redux/URL ownership                                        |
+| Bonus scope threatens core      | P0/P1 gates; drop deployment/live polish first                           |
+| Documentation drift             | Owning doc updated in same change                                        |
 
 ## Definition of done
 

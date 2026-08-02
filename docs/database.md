@@ -107,16 +107,16 @@ Migrations enforce unique email/storage/queue identifiers, positive versions/att
 
 Initial query-driven indexes:
 
-| Index | Query |
-| --- | --- |
-| unique `users(email)` | Registration/login |
-| `tasks(owner_id, deleted_at, created_at DESC, id)` | Default owned list |
-| `tasks(owner_id, status, created_at DESC, id)` | Status filter/drill-down |
-| `tasks(status, scheduled_at)` | Pending reconciliation |
-| unique nullable `tasks(queue_job_id)` | Job correlation |
-| `task_events(task_id, occurred_at DESC, id DESC)` | History |
-| `file_attachments(task_id)` | Detail/download authorization |
-| trigram GIN on title/description | Case-insensitive search |
+| Index                                              | Query                         |
+| -------------------------------------------------- | ----------------------------- |
+| unique `users(email)`                              | Registration/login            |
+| `tasks(owner_id, deleted_at, created_at DESC, id)` | Default owned list            |
+| `tasks(owner_id, status, created_at DESC, id)`     | Status filter/drill-down      |
+| `tasks(status, scheduled_at)`                      | Pending reconciliation        |
+| unique nullable `tasks(queue_job_id)`              | Job correlation               |
+| `task_events(task_id, occurred_at DESC, id DESC)`  | History                       |
+| `file_attachments(task_id)`                        | Detail/download authorization |
+| trigram GIN on title/description                   | Case-insensitive search       |
 
 `pg_trgm` and custom indexes live in reviewed migration SQL. New indexes require a demonstrated query and consideration of write/storage cost.
 

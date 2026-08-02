@@ -66,12 +66,12 @@ Frontend guards never substitute for server authorization.
 
 Redis-backed limits combine route class with IP, user, or session:
 
-| Surface | Relative policy |
-| --- | --- |
-| Login/register/refresh | Strict |
-| Upload/task create/retry | Moderate plus size/count limits |
-| Search/list | Normal plus query/page bounds |
-| Admin reads | Authenticated subject limit and logging |
+| Surface                  | Relative policy                         |
+| ------------------------ | --------------------------------------- |
+| Login/register/refresh   | Strict                                  |
+| Upload/task create/retry | Moderate plus size/count limits         |
+| Search/list              | Normal plus query/page bounds           |
+| Admin reads              | Authenticated subject limit and logging |
 
 Thresholds are validated configuration. Failure policy is deliberate: auth abuse controls fail conservatively; cache failure alone does not block ordinary reads.
 

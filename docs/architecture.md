@@ -33,14 +33,14 @@ flowchart LR
 
 ## Responsibilities
 
-| Runtime/service | Owns |
-| --- | --- |
-| Next.js | Routes, accessible responsive UI, TanStack Query, narrow Redux state |
-| Express | Validation, auth/policies, use cases, persistence, dispatch, files, OpenAPI |
-| Worker | Reconciliation, claim, executor, attempt/result/event updates, invalidation |
-| PostgreSQL | Users, task snapshot/history, results, attachment metadata |
-| Redis | BullMQ, refresh sessions, rate limits, bounded cache, ephemeral Pub/Sub |
-| Storage | Private attachment bytes behind a replaceable adapter |
+| Runtime/service | Owns                                                                        |
+| --------------- | --------------------------------------------------------------------------- |
+| Next.js         | Routes, accessible responsive UI, TanStack Query, narrow Redux state        |
+| Express         | Validation, auth/policies, use cases, persistence, dispatch, files, OpenAPI |
+| Worker          | Reconciliation, claim, executor, attempt/result/event updates, invalidation |
+| PostgreSQL      | Users, task snapshot/history, results, attachment metadata                  |
+| Redis           | BullMQ, refresh sessions, rate limits, bounded cache, ephemeral Pub/Sub     |
+| Storage         | Private attachment bytes behind a replaceable adapter                       |
 
 Next.js route handlers/server actions do not become a second business API. Redis caches and status events never replace PostgreSQL state.
 
@@ -134,12 +134,12 @@ sequenceDiagram
 
 ## Frontend state ownership
 
-| State | Owner |
-| --- | --- |
-| API resources and mutations | TanStack Query |
-| Search/filter/sort/page | URL parameters |
-| Auth presentation/global UI | Redux Toolkit |
-| Form/dialog interaction | React Hook Form/local state |
+| State                       | Owner                       |
+| --------------------------- | --------------------------- |
+| API resources and mutations | TanStack Query              |
+| Search/filter/sort/page     | URL parameters              |
+| Auth presentation/global UI | Redux Toolkit               |
+| Form/dialog interaction     | React Hook Form/local state |
 
 Socket.IO carries minimal invalidation hints; reconnect/focus refetch repairs missed events.
 

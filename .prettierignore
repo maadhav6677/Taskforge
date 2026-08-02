@@ -10,8 +10,3 @@ docs/assessment-requirements.md
 docs/implementation-plan.md
 docs/product-blueprint.md
 docs/roadmap.md
-
-# Canonical documentation is formatted in the follow-up PR.
-AGENTS.md
-README.md
-docs/*.md
