@@ -1,8 +1,12 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import multer from 'multer';
+import { env } from '../../config/env.js';
 import { prisma } from '../../infrastructure/database/prisma.js';
 import { HttpError, toSuccessResponse } from '../../shared/http.js';
 import { authenticate, requireRole } from '../auth/auth.middleware.js';
+import { FileRepository } from '../files/file.repository.js';
+import { FileStorage, UnsupportedFileTypeError } from '../files/file.storage.js';
 import { TaskDispatcher } from './task.dispatcher.js';
 import type { TaskEventRecord, TaskRecord } from './task.repository.js';
 import { TaskRepository } from './task.repository.js';
@@ -15,17 +19,36 @@ import {
 
 const taskIdSchema = z.object({ id: z.string().uuid() });
 const taskStatuses = ['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED'] as const;
-const textInputSchema = z.object({ text: z.string().min(1).max(2_000) }).strict();
-const createSchema = z
+const textInputSchema = z
   .object({
-    title: z.string().trim().min(1).max(160),
-    description: z.string().trim().max(2_000).optional(),
-    type: z.literal('TEXT_PROCESSING'),
-    input: textInputSchema,
-    scheduledAt: z.string().datetime({ offset: true }).optional(),
-    maxAttempts: z.number().int().min(1).max(5).default(3),
+    schemaVersion: z.literal(1),
+    text: z.string().min(1).max(2_000),
   })
-  .strict()
+  .strict();
+const fileInspectionInputSchema = z.object({ schemaVersion: z.literal(1) }).strict();
+const createSchema = z
+  .discriminatedUnion('type', [
+    z
+      .object({
+        title: z.string().trim().min(1).max(160),
+        description: z.string().trim().max(2_000).optional(),
+        type: z.literal('TEXT_PROCESSING'),
+        input: textInputSchema,
+        scheduledAt: z.string().datetime({ offset: true }).optional(),
+        maxAttempts: z.number().int().min(1).max(5).default(3),
+      })
+      .strict(),
+    z
+      .object({
+        title: z.string().trim().min(1).max(160),
+        description: z.string().trim().max(2_000).optional(),
+        type: z.literal('FILE_INSPECTION'),
+        input: fileInspectionInputSchema.default({ schemaVersion: 1 }),
+        scheduledAt: z.string().datetime({ offset: true }).optional(),
+        maxAttempts: z.number().int().min(1).max(5).default(3),
+      })
+      .strict(),
+  ])
   .superRefine((value, context) => {
     if (value.scheduledAt && new Date(value.scheduledAt).getTime() <= Date.now()) {
       context.addIssue({
@@ -110,10 +133,44 @@ export const createTaskRouter = () => {
   const router = Router();
   const repository = new TaskRepository(prisma);
   const service = new TaskService(repository, new TaskDispatcher(repository));
+  const fileRepository = new FileRepository(prisma);
+  const storage = new FileStorage();
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { files: env.TASK_MAX_FILES, fileSize: env.TASK_MAX_FILE_SIZE_BYTES },
+  });
   router.use(authenticate, requireRole('USER'));
 
-  router.post('/', async (req, res) => {
-    const input = createSchema.parse(req.body);
+  router.post('/', upload.array('attachments', env.TASK_MAX_FILES), async (req, res) => {
+    let body: unknown = req.body;
+    if (typeof req.body.task === 'string') {
+      try {
+        body = JSON.parse(req.body.task) as unknown;
+      } catch {
+        throw new HttpError(400, 'INVALID_JSON', 'The multipart task field must be valid JSON.');
+      }
+    }
+    const input = createSchema.parse(body);
+    const uploadFiles = (req.files ?? []) as Express.Multer.File[];
+    if (input.type === 'TEXT_PROCESSING' && uploadFiles.length > 0) {
+      throw new HttpError(422, 'FILES_NOT_ALLOWED', 'Text tasks cannot include attachments.');
+    }
+    if (input.type === 'FILE_INSPECTION' && uploadFiles.length === 0) {
+      throw new HttpError(
+        422,
+        'FILES_REQUIRED',
+        'File inspection requires at least one attachment.',
+      );
+    }
+    let verifiedFiles;
+    try {
+      verifiedFiles = await Promise.all(uploadFiles.map((file) => storage.verify(file)));
+    } catch (error) {
+      if (error instanceof UnsupportedFileTypeError) {
+        throw new HttpError(422, 'FILE_TYPE_UNSUPPORTED', error.message);
+      }
+      throw error;
+    }
     const task = await service.create(
       {
         ownerId: req.auth!.sub,
@@ -124,11 +181,39 @@ export const createTaskRouter = () => {
         ...(input.description !== undefined ? { description: input.description } : {}),
         ...(input.scheduledAt ? { scheduledAt: new Date(input.scheduledAt) } : {}),
       },
-      true,
+      input.type === 'TEXT_PROCESSING',
     );
+    const storedKeys: string[] = [];
+    const attachments = [];
+    try {
+      for (const verified of verifiedFiles) {
+        const stored = await storage.save(verified);
+        storedKeys.push(stored.storageKey);
+        attachments.push(
+          await fileRepository.create(task.id, {
+            storageKey: stored.storageKey,
+            originalName: stored.originalName,
+            mimeType: stored.mimeType,
+            sizeBytes: BigInt(stored.sizeBytes),
+          }),
+        );
+      }
+      if (input.type === 'FILE_INSPECTION') await service.dispatch(task);
+    } catch (error) {
+      await fileRepository.deleteForTask(task.id);
+      await Promise.all(storedKeys.map((key) => storage.remove(key)));
+      await repository.softDeleteEligible(req.auth!.sub, task.id, task.version, new Date());
+      throw error;
+    }
     res.status(202).json(
       toSuccessResponse(req, {
         task: serializeTask(task),
+        attachments: attachments.map((file) => ({
+          id: file.id,
+          originalName: file.originalName,
+          mimeType: file.mimeType,
+          sizeBytes: Number(file.sizeBytes),
+        })),
       }),
     );
   });
