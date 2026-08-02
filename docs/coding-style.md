@@ -1,6 +1,6 @@
 # Coding and quality conventions
 
-**Status:** Accepted baseline; tooling enforcement pending
+**Status:** Accepted baseline;
 
 Write the smallest explicit implementation that preserves product invariants. Readability, testability, and failure behavior matter more than pattern count or clever brevity.
 

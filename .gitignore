@@ -16,7 +16,10 @@ pnpm-debug.log*
 # Environment and runtime
 .env
 .DS_Store
-apps/web/next-env.d.ts
+.env.local
+.env.test
+apps/api/.env.local
+.pnpm-store/
 
 # Storage and temporary files
 storage/

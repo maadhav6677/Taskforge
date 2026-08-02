@@ -1,9 +1,9 @@
 /** @type {import('jest').Config} */
 module.exports = {
-  displayName: 'web',
-  testEnvironment: 'jsdom',
+  displayName: 'contracts',
   roots: ['<rootDir>/tests'],
-  testMatch: ['<rootDir>/tests/**/*.test.tsx', '<rootDir>/tests/**/*.test.ts'],
+  testMatch: ['<rootDir>/tests/**/*.test.ts'],
+  testEnvironment: 'node',
   transform: {
     '^.+\\.[tj]sx?$': [
       'ts-jest',
