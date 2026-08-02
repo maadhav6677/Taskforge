@@ -4,6 +4,7 @@ import { env } from '../config/env.js';
 import { logger } from '../infrastructure/logger.js';
 import { connectDatabase, disconnectDatabase } from '../infrastructure/database/prisma.js';
 import { connectRedis, disconnectRedis } from '../infrastructure/redis/redis.js';
+import { closeTaskQueue } from '../infrastructure/queue/task.queue.js';
 
 export const startApi = async (): Promise<void> => {
   await connectDatabase();
@@ -51,7 +52,7 @@ export const startApi = async (): Promise<void> => {
         resolve();
       }),
     );
-    await Promise.all([disconnectRedis(), disconnectDatabase()]);
+    await Promise.all([closeTaskQueue(), disconnectRedis(), disconnectDatabase()]);
   };
 
   let shuttingDown = false;

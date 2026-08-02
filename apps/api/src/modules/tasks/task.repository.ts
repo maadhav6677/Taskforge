@@ -304,6 +304,7 @@ export class TaskRepository {
             : {}),
           ...(input.input !== undefined ? { input: input.input } : {}),
           ...(input.scheduledAt !== undefined ? { scheduledAt: input.scheduledAt } : {}),
+          executionVersion: { increment: 1 },
           queueJobId: null,
           dispatchedAt: null,
           rowVersion: { increment: 1 },
@@ -503,7 +504,7 @@ export class TaskRepository {
       const update = await transaction.task.updateMany({
         where: { id: taskId, executionVersion, status: 'PROCESSING', deletedAt: null },
         data: retryable
-          ? { status: 'PENDING', startedAt: null, errorCode, errorMessage }
+          ? { status: 'PENDING', startedAt: null, errorCode: null, errorMessage: null }
           : { status: 'FAILED', failedAt: occurredAt, errorCode, errorMessage },
       });
       if (update.count === 0) return null;

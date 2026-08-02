@@ -243,6 +243,48 @@ describe('task repository ownership, search, history, and concurrency', () => {
     expect(history.filter(({ type }) => type === 'UPDATED')).toHaveLength(1);
   });
 
+  it('replaces the execution version when pending queued work changes', async () => {
+    const owner = await createUser('replacement-owner@taskforge.local');
+    const task = await tasks.createPending({
+      ownerId: owner.id,
+      title: 'Queued replacement fixture',
+      type: 'TEXT_PROCESSING',
+      input: { schemaVersion: 1, text: 'old payload' },
+    });
+    const dispatchedAt = new Date(Date.now() + 1_000);
+    const replacementStartedAt = new Date(dispatchedAt.getTime() + 120_000);
+
+    await expect(
+      tasks.markDispatched(
+        task.id,
+        task.executionVersion,
+        `task:${task.id}:v${task.executionVersion}`,
+        dispatchedAt,
+      ),
+    ).resolves.toBe(true);
+
+    const updated = await tasks.updatePending(owner.id, task.id, task.version, {
+      input: { schemaVersion: 1, text: 'replacement payload' },
+      scheduledAt: new Date(dispatchedAt.getTime() + 60_000),
+    });
+
+    expect(updated).toMatchObject({
+      executionVersion: task.executionVersion + 1,
+      queueJobId: null,
+      dispatchedAt: null,
+      version: task.version + 1,
+    });
+    await expect(
+      tasks.claimPending(task.id, task.executionVersion, 1, replacementStartedAt),
+    ).resolves.toBeNull();
+    await expect(
+      tasks.claimPending(task.id, task.executionVersion + 1, 1, replacementStartedAt),
+    ).resolves.toMatchObject({
+      executionVersion: task.executionVersion + 1,
+      status: 'PROCESSING',
+    });
+  });
+
   it('soft-deletes an eligible owned task without deleting its audit history', async () => {
     const owner = await createUser('delete-owner@taskforge.local');
     const otherOwner = await createUser('delete-other@taskforge.local');
@@ -303,6 +345,33 @@ describe('task repository ownership, search, history, and concurrency', () => {
         completedAt,
       ),
     ).resolves.toBeNull();
+
+    const retryable = await tasks.createPending({
+      ownerId: owner.id,
+      title: 'Retryable failure fixture',
+      type: 'TEXT_PROCESSING',
+      input: { schemaVersion: 1, text: 'retry me' },
+    });
+    const retryStartedAt = new Date(completedAt.getTime() + 1_000);
+    await expect(
+      tasks.claimPending(retryable.id, retryable.executionVersion, 1, retryStartedAt),
+    ).resolves.toMatchObject({ status: 'PROCESSING' });
+    await expect(
+      tasks.recordProcessingFailure(
+        retryable.id,
+        retryable.executionVersion,
+        1,
+        true,
+        'TRANSIENT_FAILURE',
+        'A retryable fixture failed.',
+        new Date(retryStartedAt.getTime() + 1_000),
+      ),
+    ).resolves.toMatchObject({
+      status: 'PENDING',
+      startedAt: null,
+      errorCode: null,
+      errorMessage: null,
+    });
 
     const scheduled = await tasks.createPending({
       ownerId: owner.id,

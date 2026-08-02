@@ -2,12 +2,13 @@ import request from 'supertest';
 import { createApp } from '../src/bootstrap/createApp.js';
 import { disconnectDatabase } from '../src/infrastructure/database/prisma.js';
 import { disconnectRedis } from '../src/infrastructure/redis/redis.js';
+import { closeTaskQueue } from '../src/infrastructure/queue/task.queue.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 describe('TaskForge API foundation', () => {
   afterAll(async () => {
-    await Promise.all([disconnectRedis(), disconnectDatabase()]);
+    await Promise.all([closeTaskQueue(), disconnectRedis(), disconnectDatabase()]);
   });
   it('reports liveness with a correlated request ID', async () => {
     const response = await request(createApp()).get('/api/v1/health/live').expect(200);
