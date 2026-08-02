@@ -17,6 +17,7 @@ export const getBullConnection = () => {
   return {
     host: url.hostname,
     port: Number(url.port || 6379),
+    lazyConnect: true,
     ...(url.username ? { username: decodeURIComponent(url.username) } : {}),
     ...(url.password ? { password: decodeURIComponent(url.password) } : {}),
     ...(Number.isInteger(database) ? { db: database } : {}),
@@ -24,17 +25,25 @@ export const getBullConnection = () => {
   };
 };
 
-export const taskQueue = new Queue<TaskJob>(taskQueueName, {
-  connection: getBullConnection(),
-  defaultJobOptions: {
-    removeOnComplete: { age: 24 * 60 * 60, count: 1_000 },
-    removeOnFail: { age: 7 * 24 * 60 * 60, count: 2_000 },
-  },
-});
+let singleton: Queue<TaskJob> | undefined;
+
+export const getTaskQueue = (): Queue<TaskJob> => {
+  singleton ??= new Queue<TaskJob>(taskQueueName, {
+    connection: getBullConnection(),
+    defaultJobOptions: {
+      removeOnComplete: { age: 24 * 60 * 60, count: 1_000 },
+      removeOnFail: { age: 7 * 24 * 60 * 60, count: 2_000 },
+    },
+  });
+  return singleton;
+};
 
 export const taskJobId = (taskId: string, executionVersion: number): string =>
   `${taskId}-${executionVersion}`;
 
 export const closeTaskQueue = async (): Promise<void> => {
-  await taskQueue.close();
+  if (!singleton) return;
+  const queue = singleton;
+  singleton = undefined;
+  await queue.close();
 };

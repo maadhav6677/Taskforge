@@ -5,3 +5,4 @@ process.env.REDIS_URL_TEST ??= 'redis://localhost:6379/15';
 process.env.REDIS_URL = process.env.REDIS_URL_TEST;
 process.env.JWT_ACCESS_SECRET = 'test-access-secret-1234567890-abcdefghijklmnopqrstuvwxyz';
 process.env.JWT_REFRESH_SECRET = 'test-refresh-secret-1234567890-abcdefghijklmnopqrstuvwxyz';
+process.env.TASK_FILE_STORAGE_PATH = './tmp/test-uploads';
