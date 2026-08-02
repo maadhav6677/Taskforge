@@ -20,6 +20,7 @@ export const connectRedis = async (client: TaskforgeRedisClient = redis): Promis
 };
 
 export const disconnectRedis = async (client: TaskforgeRedisClient = redis): Promise<void> => {
+  if (client.status === 'wait' || client.status === 'end') return;
   if (client.status === 'ready') {
     await client.quit();
     return;

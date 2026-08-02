@@ -402,7 +402,7 @@ textarea {
 }
 .filters {
   display: grid;
-  grid-template-columns: 1fr 170px;
+  grid-template-columns: minmax(180px, 1fr) 150px 170px;
   gap: 0.7rem;
   padding: 0 1.35rem 1rem;
 }

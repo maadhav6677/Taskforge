@@ -40,7 +40,7 @@ USER nodejs
 
 FROM runtime-base AS api
 EXPOSE 4000
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/apps/api/src/index.js"]
 
 FROM runtime-base AS worker
-CMD ["node", "dist/worker.js"]
+CMD ["node", "dist/apps/api/src/worker.js"]

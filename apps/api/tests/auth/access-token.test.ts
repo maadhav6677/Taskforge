@@ -12,9 +12,12 @@ describe('access tokens', () => {
     await expect(verifyAccessToken(token)).resolves.toEqual(principal);
   });
 
-  it('rejects a token signed with another key', async () => {
+  it('rejects a token with a modified signature', async () => {
     const token = await signAccessToken(principal);
-    const tampered = `${token.slice(0, -1)}${token.endsWith('a') ? 'b' : 'a'}`;
+    const [header, payload, signature] = token.split('.');
+    if (!header || !payload || !signature) throw new Error('Expected a compact JWT.');
+    const tamperedSignature = `${signature.startsWith('a') ? 'b' : 'a'}${signature.slice(1)}`;
+    const tampered = `${header}.${payload}.${tamperedSignature}`;
     await expect(verifyAccessToken(tampered)).rejects.toBeDefined();
   });
 });

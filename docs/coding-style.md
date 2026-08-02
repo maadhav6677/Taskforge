@@ -1,6 +1,6 @@
 # Coding and quality conventions
 
-**Status:** Accepted baseline;
+**Status:** Accepted baseline
 
 Write the smallest explicit implementation that preserves product invariants. Readability, testability, and failure behavior matter more than pattern count or clever brevity.
 
@@ -85,6 +85,10 @@ Add interfaces only at meaningful seams or with multiple implementations. No aut
 - E2E: small Playwright critical flows only after core stability.
 
 Name tests by observable behavior, avoid implementation-only assertions/shared mutable state, use fake clocks for pure logic, and bounded polling—not fixed sleeps—for workers.
+
+The default Jest suites remain infrastructure-independent. Real PostgreSQL verification runs
+through `pnpm test:integration:postgres`; its lifecycle refuses non-`_test` database names,
+recreates the test database from committed migrations, runs serially, and cleans up afterward.
 
 ## Dependencies, documentation, and Git
 

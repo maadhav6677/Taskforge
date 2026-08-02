@@ -32,9 +32,6 @@ const fetchCsrf = async (): Promise<string> => {
 };
 
 let refreshPromise: Promise<boolean> | undefined;
-const skipsRefreshRetry = (path: string): boolean =>
-  ['/auth/login', '/auth/register', '/auth/refresh', '/auth/logout'].includes(path);
-
 const refreshSession = (): Promise<boolean> => {
   refreshPromise ??= (async () => {
     const csrf = readCookie('tf_csrf') ?? (await fetchCsrf());
@@ -68,7 +65,7 @@ export const apiRequest = async <T>(
     headers,
     credentials: 'include',
   });
-  if (response.status === 401 && allowRefresh && !skipsRefreshRetry(path)) {
+  if (response.status === 401 && allowRefresh && !path.startsWith('/auth/')) {
     if (await refreshSession()) return apiRequest<T>(path, init, false);
   }
   if (!response.ok) {
