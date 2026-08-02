@@ -20,7 +20,7 @@ Deployment is the first item dropped if reliability is uncertain.
 | ----: | -------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
 |     0 | Requirements, architecture, decisions, contracts                                 | Complete                                                           |
 |     1 | pnpm workspace; Next/Express API+worker; TS/lint/test/config/log/health baseline | Root install/check/test/build works; runtimes start separately     |
-|     2 | Prisma/PostgreSQL schema, constraints, indexes, migrations, seed                 | Empty DB migrates/seeds; repository integration tests pass         |
+|     2 | Prisma/PostgreSQL schema, constraints, indexes, migrations, seed                 | Complete                                                           |
 |     3 | Argon2id auth, access JWT, Redis refresh rotation, CSRF/CORS/RBAC                | Rotation/revocation/negative authorization tests pass              |
 |     4 | Task state policy, CRUD/history/list/admin REST and OpenAPI                      | Lifecycle, ownership, pagination, status/error contract tests pass |
 |     5 | BullMQ worker, scheduling, retries, idempotency, reconciliation                  | Async/delay/retry/duplicate/outage integration tests pass          |

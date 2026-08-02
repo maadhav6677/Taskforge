@@ -11,6 +11,7 @@ FROM toolchain AS build
 COPY pnpm-lock.yaml ./
 COPY pnpm-workspace.yaml ./
 COPY package.json ./
+COPY .env.example ./
 COPY apps/api/package.json ./apps/api/package.json
 COPY apps/web/package.json ./apps/web/package.json
 COPY packages/contracts/package.json ./packages/contracts/package.json
@@ -23,13 +24,15 @@ COPY apps/api ./apps/api
 COPY packages/contracts ./packages/contracts
 
 RUN pnpm --filter @taskforge/contracts build
+RUN pnpm --filter @taskforge/api db:generate
 RUN pnpm --filter @taskforge/api build
-RUN pnpm --filter @taskforge/api --prod deploy --legacy /prod/api
+RUN pnpm --filter @taskforge/api --prod --no-optional deploy --legacy /prod/api
 
 FROM node:24-alpine AS runtime-base
 ENV NODE_ENV=production
 WORKDIR /app
-RUN addgroup -S nodejs && adduser -S nodejs -G nodejs
+RUN addgroup -S nodejs && adduser -S nodejs -G nodejs && \
+    mkdir -p /app/storage/tasks && chown -R nodejs:nodejs /app/storage
 
 COPY --from=build --chown=nodejs:nodejs /prod/api ./
 

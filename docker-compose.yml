@@ -4,7 +4,7 @@ services:
     container_name: taskforge-redis
     command: redis-server --appendonly yes --save 60 1 --maxmemory-policy noeviction
     ports:
-      - '6379:6379'
+      - '${TASKFORGE_REDIS_PORT:-6379}:6379'
     volumes:
       - redis-data:/data
 
@@ -16,9 +16,14 @@ services:
       POSTGRES_PASSWORD: taskforge
       POSTGRES_DB: taskforge
     ports:
-      - '5432:5432'
+      - '${TASKFORGE_POSTGRES_PORT:-5432}:5432'
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - postgres-data-v18:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U taskforge -d taskforge']
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   api:
     build:
@@ -27,12 +32,19 @@ services:
       target: api
     container_name: taskforge-api
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
     env_file:
       - .env.example
+    environment:
+      DATABASE_URL: postgresql://taskforge:taskforge@postgres:5432/taskforge
+      REDIS_URL: redis://redis:6379
     ports:
       - '4000:4000'
+    volumes:
+      - task-uploads:/app/storage/tasks
     healthcheck:
       test: ['CMD', 'wget', '-q', '-O', '-', 'http://localhost:4000/api/v1/health/live']
       interval: 10s
@@ -46,11 +58,19 @@ services:
       target: worker
     container_name: taskforge-worker
     depends_on:
-      - postgres
-      - redis
-      - api
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      api:
+        condition: service_healthy
     env_file:
       - .env.example
+    environment:
+      DATABASE_URL: postgresql://taskforge:taskforge@postgres:5432/taskforge
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - task-uploads:/app/storage/tasks
 
   web:
     build:
@@ -65,5 +85,6 @@ services:
       - '3000:3000'
 
 volumes:
-  postgres-data:
+  postgres-data-v18:
   redis-data:
+  task-uploads:

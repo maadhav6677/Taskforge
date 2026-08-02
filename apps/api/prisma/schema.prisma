@@ -1,0 +1,118 @@
+generator client {
+  provider               = "prisma-client"
+  output                 = "../src/generated/prisma"
+  moduleFormat           = "esm"
+  generatedFileExtension = "ts"
+  importFileExtension    = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum TaskType {
+  TEXT_PROCESSING
+  FILE_INSPECTION
+}
+
+enum TaskStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum TaskEventType {
+  CREATED
+  UPDATED
+  SCHEDULED
+  DISPATCHED
+  STARTED
+  RETRY_SCHEDULED
+  COMPLETED
+  FAILED
+  MANUAL_RETRY
+  DELETED
+}
+
+model User {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email        String   @unique(map: "users_email_key") @db.VarChar(320)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  role         Role     @default(USER)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  tasks        Task[]
+
+  @@map("users")
+}
+
+model Task {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId          String           @map("owner_id") @db.Uuid
+  title            String           @db.VarChar(160)
+  description      String?          @db.VarChar(2000)
+  type             TaskType
+  input            Json
+  result           Json?
+  status           TaskStatus       @default(PENDING)
+  errorCode        String?          @map("error_code") @db.VarChar(80)
+  errorMessage     String?          @map("error_message") @db.VarChar(500)
+  executionVersion Int              @default(1) @map("execution_version")
+  attemptsMade     Int              @default(0) @map("attempts_made")
+  maxAttempts      Int              @default(3) @map("max_attempts")
+  queueJobId       String?          @unique(map: "tasks_queue_job_id_key") @map("queue_job_id") @db.VarChar(255)
+  scheduledAt      DateTime?        @map("scheduled_at") @db.Timestamptz(3)
+  dispatchedAt     DateTime?        @map("dispatched_at") @db.Timestamptz(3)
+  startedAt        DateTime?        @map("started_at") @db.Timestamptz(3)
+  completedAt      DateTime?        @map("completed_at") @db.Timestamptz(3)
+  failedAt         DateTime?        @map("failed_at") @db.Timestamptz(3)
+  rowVersion       Int              @default(1) @map("row_version")
+  deletedAt        DateTime?        @map("deleted_at") @db.Timestamptz(3)
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  owner            User             @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  events           TaskEvent[]
+  attachments      FileAttachment[]
+
+  @@index([ownerId, deletedAt, createdAt(sort: Desc), id], map: "tasks_owner_active_created_idx")
+  @@index([ownerId, status, deletedAt, createdAt(sort: Desc), id], map: "tasks_owner_status_created_idx")
+  @@index([status, scheduledAt], map: "tasks_status_scheduled_idx")
+  @@map("tasks")
+}
+
+model TaskEvent {
+  id               BigInt        @id @default(autoincrement()) @db.BigInt
+  taskId           String        @map("task_id") @db.Uuid
+  type             TaskEventType
+  fromStatus       TaskStatus?   @map("from_status")
+  toStatus         TaskStatus?   @map("to_status")
+  executionVersion Int           @map("execution_version")
+  attempt          Int?
+  metadata         Json          @default("{}")
+  occurredAt       DateTime      @default(now()) @map("occurred_at") @db.Timestamptz(3)
+  task             Task          @relation(fields: [taskId], references: [id], onDelete: Restrict)
+
+  @@index([taskId, occurredAt(sort: Desc), id(sort: Desc)], map: "task_events_task_history_idx")
+  @@map("task_events")
+}
+
+model FileAttachment {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  taskId       String   @map("task_id") @db.Uuid
+  storageKey   String   @unique(map: "file_attachments_storage_key_key") @map("storage_key") @db.VarChar(255)
+  originalName String   @map("original_name") @db.VarChar(255)
+  mimeType     String   @map("mime_type") @db.VarChar(100)
+  sizeBytes    BigInt   @map("size_bytes") @db.BigInt
+  sha256       String?  @db.VarChar(64)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  task         Task     @relation(fields: [taskId], references: [id], onDelete: Restrict)
+
+  @@index([taskId], map: "file_attachments_task_id_idx")
+  @@map("file_attachments")
+}

@@ -1,6 +1,6 @@
 # Security design
 
-**Status:** Accepted baseline; threat tests pending
+**Status:** Prototype controls implemented; complete threat matrix pending
 
 ## Trust boundaries
 
@@ -78,7 +78,7 @@ Thresholds are validated configuration. Failure policy is deliberate: auth abuse
 ## Secrets and logs
 
 - Validate environment configuration once at startup; never print values.
-- `.env.example` contains placeholders only; real secrets use environment/secret management.
+- `.env.example` contains clearly marked development-only values; real deployments override them through environment/secret management.
 - Never expose secrets through `NEXT_PUBLIC_*`, images, snapshots, logs, collections, or video.
 - Pino logs request/service/task/job/execution identifiers and stable error codes.
 - Redact cookies, auth/CSRF headers, passwords/hashes, tokens, connection URLs, file bytes/paths, and full user payloads.
