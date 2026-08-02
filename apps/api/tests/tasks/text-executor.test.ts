@@ -13,7 +13,9 @@ describe('text task executor', () => {
   });
 
   it('rejects invalid input and exposes the deterministic failure fixture', () => {
-    expect(() => executeTextTask({ schemaVersion: 1, text: 'Trigger [[FAIL]] safely.' })).toThrow(TextExecutionError);
+    expect(() =>
+      executeTextTask({ schemaVersion: 1, text: 'Trigger [[FAIL]] safely.' }),
+    ).toThrow(TextExecutionError);
     expect(() => executeTextTask({ text: '' })).toThrow();
   });
 });
