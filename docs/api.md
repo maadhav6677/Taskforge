@@ -89,6 +89,12 @@ Codes are stable identifiers; validation `details` are optional and field-safe.
 
 Initial admin scope is read-only; admin mutations require new audit/product rules.
 
+### Operational health
+
+- `/health/live` returns `200` when the API process can serve HTTP; it does not imply dependency readiness.
+- `/health/ready` returns `200` only after bounded PostgreSQL and Redis checks succeed.
+- Until those checks are integrated, the Phase 1 readiness shell returns `503` with the stable code `SERVICE_NOT_READY`. A failed required dependency check will also return `503`.
+
 ## Authentication transport
 
 - Short-lived access JWT and rotating refresh credential use `Secure`, `HttpOnly`, `SameSite=Lax` cookies in production.

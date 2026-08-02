@@ -1,11 +1,5 @@
 import type { ApiErrorPayload, ApiSuccessResponse } from './http.js';
 
-export interface ServiceHealth {
-  status: 'ok' | 'degraded';
-  checkedAt: string;
-  dependencies: ServiceDependencies;
-}
-
 export interface ServiceDependencies {
   redis: 'unchecked' | 'ok' | 'down';
   postgres: 'unchecked' | 'ok' | 'down';
