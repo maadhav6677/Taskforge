@@ -21,6 +21,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit && tsc -p tsconfig.integration.json --noEmit",
     "lint": "eslint src tests prisma/*.ts prisma.config.ts",
     "lint:fix": "eslint src tests prisma/*.ts prisma.config.ts --fix",
+    "pretest": "pnpm --filter @taskforge/contracts build",
     "test": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js",
     "pretest:integration:postgres": "pnpm --filter @taskforge/contracts build",
     "test:integration:postgres": "tsx tests/integration/run-postgres-integration.ts"
