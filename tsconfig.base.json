@@ -6,7 +6,7 @@
     "moduleResolution": "NodeNext",
     "baseUrl": ".",
     "paths": {
-      "@taskforge/contracts": ["packages/contracts/src"]
+      "@taskforge/contracts": ["packages/contracts/src/index.ts"]
     },
     "strict": true,
     "noUnusedLocals": true,
