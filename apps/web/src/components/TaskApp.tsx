@@ -360,7 +360,10 @@ function CreateTaskPanel({
         title: values.title,
         description: values.description || undefined,
         type: values.type,
-        input: values.type === 'TEXT_PROCESSING' ? { text: values.text } : {},
+        input:
+          values.type === 'TEXT_PROCESSING'
+            ? { schemaVersion: 1, text: values.text }
+            : { schemaVersion: 1 },
         scheduledAt: values.scheduledAt ? new Date(values.scheduledAt).toISOString() : undefined,
         maxAttempts: 3,
       };
@@ -651,7 +654,9 @@ function EditTaskForm({
           title: values.title,
           description: values.description || null,
           scheduledAt: values.scheduledAt ? new Date(values.scheduledAt).toISOString() : null,
-          ...(task.type === 'TEXT_PROCESSING' ? { input: { text: values.text } } : {}),
+          ...(task.type === 'TEXT_PROCESSING'
+            ? { input: { schemaVersion: 1, text: values.text } }
+            : {}),
         }),
       }),
     onSuccess: onChanged,

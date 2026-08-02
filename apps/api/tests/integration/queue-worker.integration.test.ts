@@ -35,7 +35,7 @@ describe('BullMQ worker lifecycle', () => {
         ownerId: owner.id,
         title: 'Worker integration fixture',
         type: 'TEXT_PROCESSING',
-        input: { text: 'one durable execution' },
+        input: { schemaVersion: 1, text: 'one durable execution' },
       });
       const dispatcher = new TaskDispatcher(tasks);
       await Promise.all([dispatcher.dispatch(task), dispatcher.dispatch(task)]);

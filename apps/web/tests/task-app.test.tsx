@@ -22,7 +22,7 @@ const task: Task = {
   title: 'Inspect the release asset',
   description: 'A private image inspection',
   type: 'FILE_INSPECTION',
-  input: {},
+  input: { schemaVersion: 1 },
   result: null,
   status: 'PENDING',
   errorMessage: null,
