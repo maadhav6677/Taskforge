@@ -1,6 +1,6 @@
 # Delivery plan
 
-**Status:** Active; Phase 1 complete, Phase 2 not started
+**Status:** End-to-end prototype implemented; final production/submission gates remain active
 
 ## Strategy
 
@@ -31,6 +31,8 @@ Deployment is the first item dropped if reliability is uncertain.
 |    10 | Full hardening, Docker, CI, OpenAPI/Postman, README, video                       | Clean-room setup and public submission checklist pass              |
 
 Update phase status here only when its gate passes. File creation alone is not completion.
+
+The current working tree implements the prototype scope across Phases 0–10. Phases 0–2 gates and the real PostgreSQL/Redis/BullMQ integration gate pass locally. The remaining table gates are retained as release criteria: do not describe manual accessibility, browser E2E, outage matrices, public CI execution, video, or deployment as complete until their evidence exists.
 
 ## Milestone details
 

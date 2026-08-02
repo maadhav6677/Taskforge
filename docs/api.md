@@ -1,6 +1,6 @@
 # API contract
 
-**Status:** Proposed; generated OpenAPI becomes machine-verifiable after implementation
+**Status:** Prototype implemented; OpenAPI is served at `/api/v1/openapi.json`
 
 ## Conventions
 
@@ -93,7 +93,7 @@ Initial admin scope is read-only; admin mutations require new audit/product rule
 
 - `/health/live` returns `200` when the API process can serve HTTP; it does not imply dependency readiness.
 - `/health/ready` returns `200` only after bounded PostgreSQL and Redis checks succeed.
-- Until those checks are integrated, the Phase 1 readiness shell returns `503` with the stable code `SERVICE_NOT_READY`. A failed required dependency check will also return `503`.
+- A failed or timed-out required dependency check returns `503` with the stable code `SERVICE_NOT_READY`.
 
 ## Authentication transport
 
