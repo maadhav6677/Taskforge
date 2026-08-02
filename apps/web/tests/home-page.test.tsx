@@ -1,13 +1,22 @@
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import HomePage from '../src/app/page';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AuthView } from '../src/components/AuthView';
 
 describe('Home page', () => {
-  it('presents the TaskForge product and current foundation status', () => {
-    render(<HomePage />);
+  it('presents the product value and accessible login form', () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <AuthView onAuthenticated={() => undefined} />
+      </QueryClientProvider>,
+    );
 
-    expect(screen.getByRole('heading', { level: 1, name: 'TaskForge' })).toBeInTheDocument();
-    expect(screen.getByText(/task automation platform with asynchronous execution/i)).toBeVisible();
-    expect(screen.getByText(/core auth, tasks, queue, storage, and persistence/i)).toBeVisible();
+    expect(
+      screen.getByRole('heading', { level: 1, name: /turn queued work into a clear/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: /sign in to taskforge/i })).toBeVisible();
+    expect(screen.getByLabelText('Email')).toBeVisible();
+    expect(screen.getByLabelText('Password')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeEnabled();
   });
 });

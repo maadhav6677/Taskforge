@@ -1,16 +1,9 @@
 import { configureStore } from '@reduxjs/toolkit';
-
-type FoundationState = Record<string, never>;
-
-const initialState: FoundationState = {};
-
-// Redux requires a real reducer before feature slices exist. Replace this with
-// an explicit slice map when the first client-only global state is introduced.
-const rootReducer = (state: FoundationState = initialState): FoundationState => state;
+import { uiReducer } from './uiSlice';
 
 export const makeStore = () =>
   configureStore({
-    reducer: rootReducer,
+    reducer: { ui: uiReducer },
   });
 
 export type AppStore = ReturnType<typeof makeStore>;
