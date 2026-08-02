@@ -1,9 +1,14 @@
 import request from 'supertest';
 import { createApp } from '../src/bootstrap/createApp.js';
+import { disconnectDatabase } from '../src/infrastructure/database/prisma.js';
+import { disconnectRedis } from '../src/infrastructure/redis/redis.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 describe('TaskForge API foundation', () => {
+  afterAll(async () => {
+    await Promise.all([disconnectRedis(), disconnectDatabase()]);
+  });
   it('reports liveness with a correlated request ID', async () => {
     const response = await request(createApp()).get('/api/v1/health/live').expect(200);
 
@@ -50,6 +55,14 @@ describe('TaskForge API foundation', () => {
     expect(response.body.requestId).toMatch(uuidPattern);
     expect(response.headers['x-request-id']).toBe(response.body.requestId);
     expect(response.body).not.toHaveProperty('stack');
+  });
+
+  it('rejects a state-changing request without an allowed origin and CSRF pair', async () => {
+    const response = await request(createApp())
+      .post('/api/v1/auth/login')
+      .send({ email: 'user@taskforge.local', password: 'TaskForge123!' })
+      .expect(403);
+    expect(response.body.error.code).toBe('CSRF_INVALID');
   });
 
   it('allows the configured browser origin without reflecting an untrusted origin', async () => {

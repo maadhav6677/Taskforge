@@ -2,6 +2,26 @@ import { Router } from 'express';
 import { healthSuccess } from '../../shared/contract.js';
 import { toErrorResponse, toSuccessResponse } from '../../shared/http.js';
 import type { Request, Response } from 'express';
+import { prisma } from '../../infrastructure/database/prisma.js';
+import { redis } from '../../infrastructure/redis/redis.js';
+import { env } from '../../config/env.js';
+
+const withTimeout = async <T>(operation: Promise<T>): Promise<T> => {
+  let timeout: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_resolve, reject) => {
+        timeout = setTimeout(
+          () => reject(new Error('Dependency check timed out.')),
+          env.API_HEALTH_TIMEOUT_MS,
+        );
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+};
 
 export const createHealthRouter = () => {
   const router = Router();
@@ -16,7 +36,20 @@ export const createHealthRouter = () => {
     });
   });
 
-  router.get('/health/ready', (req: Request, res: Response) => {
+  router.get('/health/ready', async (req: Request, res: Response) => {
+    const [postgres, redisCheck] = await Promise.allSettled([
+      withTimeout(prisma.$queryRaw`SELECT 1`),
+      withTimeout(redis.ping()),
+    ]);
+    if (postgres.status === 'fulfilled' && redisCheck.status === 'fulfilled') {
+      res.json(
+        toSuccessResponse(req, {
+          status: 'ready',
+          dependencies: { postgres: 'ok', redis: 'ok', queue: 'ok' },
+        }),
+      );
+      return;
+    }
     res
       .status(503)
       .json(
@@ -27,7 +60,7 @@ export const createHealthRouter = () => {
   router.get('/docs', (req, res) => {
     res.status(200).json(
       toSuccessResponse(req, {
-        message: 'OpenAPI generation is intentionally not started in Phase 1.',
+        message: 'OpenAPI generation is introduced in the submission hardening phase.',
       }),
     );
   });
@@ -39,7 +72,7 @@ export const createHealthRouter = () => {
         toErrorResponse(
           req,
           'OPENAPI_NOT_AVAILABLE',
-          'OpenAPI generation is intentionally not started in Phase 1.',
+          'OpenAPI generation is introduced in the submission hardening phase.',
         ),
       );
   });
