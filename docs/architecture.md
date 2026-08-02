@@ -55,7 +55,7 @@ Next.js route handlers/server actions do not become a second business API. Redis
 
 Controllers translate HTTP, services implement use cases, concrete repositories own persistence, and executors perform task work. See [coding-style.md](coding-style.md).
 
-## Planned repository
+## Repository structure
 
 ```text
 apps/
@@ -155,7 +155,7 @@ Initial private local storage is shared only by API and worker containers. The A
 
 ## Runtime topology
 
-Compose will run `web`, `api`, `worker`, `postgres`, and `redis`, plus named data/upload volumes. The API and worker share one multi-target Docker build, while the web runtime uses Next.js standalone output. Images use pinned deterministic installs, production-only runtime dependencies, non-root users, health checks, and graceful termination. Migrations run explicitly once rather than from every replica.
+Compose will run `web`, `api`, `worker`, `postgres`, and `redis`, plus named data/upload volumes. PostgreSQL 18 uses its version-aware `/var/lib/postgresql` volume layout and gates API/worker startup on `pg_isready`. The API and worker share one multi-target Docker build, generate the pinned Prisma client during the build, and close their database pool during graceful shutdown; the web runtime uses Next.js standalone output. Images use pinned deterministic installs, production-only runtime dependencies, non-root users, and health checks. Migrations run explicitly once rather than from every replica.
 
 Operational requirements:
 
