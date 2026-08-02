@@ -1,24 +1,28 @@
-import type { ApiErrorPayload, ApiSuccessResponse } from './http';
+import type { ApiErrorPayload, ApiSuccessResponse } from './http.js';
 
 export interface ServiceHealth {
   status: 'ok' | 'degraded';
   checkedAt: string;
-  dependencies: {
-    redis: 'unchecked' | 'ok' | 'down';
-    postgres: 'unchecked' | 'ok' | 'down';
-    queue: 'unchecked' | 'ok' | 'down';
-  };
+  dependencies: ServiceDependencies;
+}
+
+export interface ServiceDependencies {
+  redis: 'unchecked' | 'ok' | 'down';
+  postgres: 'unchecked' | 'ok' | 'down';
+  queue: 'unchecked' | 'ok' | 'down';
 }
 
 export interface HealthPayload {
   status: 'alive';
   version: string;
+  checkedAt: string;
+  dependencies: ServiceDependencies;
 }
 
 export const healthSuccess = (
   requestId: string,
-  dependencies: ServiceHealth['dependencies'],
-): ApiSuccessResponse<HealthPayload & ServiceHealth> => ({
+  dependencies: ServiceDependencies,
+): ApiSuccessResponse<HealthPayload> => ({
   data: {
     status: 'alive',
     version: '0.1.0',
@@ -32,4 +36,4 @@ export const errorPayload = (
   code: string,
   message: string,
   details?: ApiErrorPayload['details'],
-): ApiErrorPayload => ({ code, message, details });
+): ApiErrorPayload => ({ code, message, ...(details === undefined ? {} : { details }) });

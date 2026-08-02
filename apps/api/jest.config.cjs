@@ -1,6 +1,5 @@
-import type { Config } from 'jest';
-
-const config: Config = {
+/** @type {import('jest').Config} */
+module.exports = {
   displayName: 'api',
   roots: ['<rootDir>/src'],
   testMatch: ['<rootDir>/src/**/*.test.ts'],
@@ -15,5 +14,3 @@ const config: Config = {
   passWithNoTests: true,
   testEnvironment: 'node',
 };
-
-export default config;

@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { healthSuccess, ServiceHealth } from '../../shared/contract.js';
+import { healthSuccess } from '../../shared/contract.js';
+import type { ServiceHealth } from '../../shared/contract.js';
 import { toErrorResponse, toSuccessResponse } from '../../shared/http.js';
 import type { Request, Response } from 'express';
 
@@ -45,13 +46,15 @@ export const createHealthRouter = () => {
   });
 
   router.get('/openapi.json', (req, res) => {
-    res.status(503).json(
-      toErrorResponse(
-        req,
-        'OPENAPI_NOT_AVAILABLE',
-        'OpenAPI generation is intentionally not started in Phase 1.',
-      ),
-    );
+    res
+      .status(503)
+      .json(
+        toErrorResponse(
+          req,
+          'OPENAPI_NOT_AVAILABLE',
+          'OpenAPI generation is intentionally not started in Phase 1.',
+        ),
+      );
   });
 
   return router;

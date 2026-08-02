@@ -7,11 +7,7 @@ export const metadata = {
   description: 'Production-minded task automation platform',
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
