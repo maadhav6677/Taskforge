@@ -5,6 +5,7 @@ import { logger } from '../infrastructure/logger.js';
 import { connectDatabase, disconnectDatabase } from '../infrastructure/database/prisma.js';
 import { connectRedis, disconnectRedis } from '../infrastructure/redis/redis.js';
 import { closeTaskQueue } from '../infrastructure/queue/task.queue.js';
+import { startSocketServer } from '../infrastructure/realtime/socket-server.js';
 
 export const startApi = async (): Promise<void> => {
   await connectDatabase();
@@ -41,6 +42,14 @@ export const startApi = async (): Promise<void> => {
     },
     'TaskForge API started',
   );
+  let closeSockets: () => Promise<void>;
+  try {
+    closeSockets = await startSocketServer(server);
+  } catch (error) {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await Promise.all([closeTaskQueue(), disconnectRedis(), disconnectDatabase()]);
+    throw error;
+  }
 
   const close = async (): Promise<void> => {
     await new Promise<void>((resolve, reject) =>
@@ -52,6 +61,7 @@ export const startApi = async (): Promise<void> => {
         resolve();
       }),
     );
+    await closeSockets();
     await Promise.all([closeTaskQueue(), disconnectRedis(), disconnectDatabase()]);
   };
 
