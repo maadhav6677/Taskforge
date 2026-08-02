@@ -7,7 +7,9 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   API_PORT: z.coerce.number().int().positive().max(65535).default(4000),
   API_BASE_PATH: z.string().default('/api/v1'),
-  API_CORS_ORIGINS: z.string().default('http://localhost:3000'),
+  API_CORS_ORIGINS: z
+    .string()
+    .default('http://localhost:3000,http://127.0.0.1:3000,http://0.0.0.0:3000'),
   API_MAX_JSON_BYTES: z.coerce.number().int().positive().default(1_048_576),
   API_BODY_BYTES: z.coerce.number().int().positive().default(5_242_880),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),

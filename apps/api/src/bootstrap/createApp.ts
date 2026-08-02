@@ -39,7 +39,7 @@ export const createApp = () => {
           callback(null, true);
           return;
         }
-        callback(new Error('CORS not allowed'));
+        callback(null, false);
       },
       credentials: true,
     }),

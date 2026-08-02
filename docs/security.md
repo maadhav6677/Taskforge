@@ -24,6 +24,8 @@ No token enters localStorage, Redux, logs, API bodies, Postman exports, or video
 ## CSRF, CORS, and transport
 
 - Credentialed CORS uses exact configured frontend origins, never `*`.
+- Local development may configure multiple exact loopback origins such as `localhost`, `127.0.0.1`,
+  and `0.0.0.0` so browser requests work regardless of which printed dev URL is opened.
 - State-changing requests require allowed `Origin` and matching double-submit CSRF cookie/header.
 - `SameSite=Lax` is defense in depth, not the only CSRF control.
 - Production requires HTTPS, secure cookies, narrow proxy trust, Helmet, restrictive CSP/headers, and production HSTS behind confirmed TLS.
