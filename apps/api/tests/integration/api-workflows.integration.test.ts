@@ -122,7 +122,7 @@ describe('authenticated API workflows', () => {
       .send({
         title: 'HTTP ownership fixture',
         type: 'TEXT_PROCESSING',
-        input: { text: 'persist first and execute elsewhere' },
+        input: { schemaVersion: 1, text: 'persist first and execute elsewhere' },
         maxAttempts: 3,
       })
       .expect(202);
@@ -177,7 +177,7 @@ describe('authenticated API workflows', () => {
         JSON.stringify({
           title: 'Inspect a verified image',
           type: 'FILE_INSPECTION',
-          input: {},
+          input: { schemaVersion: 1 },
           maxAttempts: 2,
         }),
       )
@@ -198,7 +198,11 @@ describe('authenticated API workflows', () => {
       .set('x-csrf-token', invalidCsrf)
       .field(
         'task',
-        JSON.stringify({ title: 'Reject active content', type: 'FILE_INSPECTION', input: {} }),
+        JSON.stringify({
+          title: 'Reject active content',
+          type: 'FILE_INSPECTION',
+          input: { schemaVersion: 1 },
+        }),
       )
       .attach('attachments', Buffer.from('<html>unsafe</html>'), 'unsafe.png')
       .expect(422);
