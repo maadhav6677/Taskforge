@@ -46,4 +46,28 @@ describe('apiRequest', () => {
     expect(fetchMock.mock.calls[1][0]).toBe('http://localhost:4000/api/v1/auth/refresh');
     expect(fetchMock.mock.calls[2][0]).toBe('http://localhost:4000/api/v1/auth/me');
   });
+
+  it('sends decoded CSRF cookie values on state-changing requests', async () => {
+    document.cookie = `tf_csrf=${encodeURIComponent('csrf/token=value')}`;
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(201, {
+        data: {
+          user: {
+            id: 'a3c78a05-12a1-4f58-8eb5-90230a197bda',
+            email: 'new@taskforge.local',
+            role: 'USER',
+          },
+        },
+        requestId: 'register',
+      }),
+    );
+
+    await apiRequest('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ email: 'new@taskforge.local', password: 'TaskForge123!' }),
+    });
+
+    const headers = fetchMock.mock.calls[0][1]?.headers as Headers;
+    expect(headers.get('x-csrf-token')).toBe('csrf/token=value');
+  });
 });

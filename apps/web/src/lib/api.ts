@@ -24,21 +24,26 @@ const readCookie = (name: string): string | undefined =>
     .slice(1)
     .join('=');
 
+const readDecodedCookie = (name: string): string | undefined => {
+  const value = readCookie(name);
+  return value ? decodeURIComponent(value) : undefined;
+};
+
 const fetchCsrf = async (): Promise<string> => {
   await fetch(`${apiBase}/auth/csrf`, { credentials: 'include' });
-  const token = readCookie('tf_csrf');
+  const token = readDecodedCookie('tf_csrf');
   if (!token) throw new ApiError(503, 'CSRF_UNAVAILABLE', 'Could not establish a secure session.');
-  return decodeURIComponent(token);
+  return token;
 };
 
 let refreshPromise: Promise<boolean> | undefined;
 const refreshSession = (): Promise<boolean> => {
   refreshPromise ??= (async () => {
-    const csrf = readCookie('tf_csrf') ?? (await fetchCsrf());
+    const csrf = readDecodedCookie('tf_csrf') ?? (await fetchCsrf());
     const response = await fetch(`${apiBase}/auth/refresh`, {
       method: 'POST',
       credentials: 'include',
-      headers: { 'x-csrf-token': decodeURIComponent(csrf) },
+      headers: { 'x-csrf-token': csrf },
     });
     return response.ok;
   })().finally(() => {
@@ -58,7 +63,7 @@ export const apiRequest = async <T>(
   const method = (init.method ?? 'GET').toUpperCase();
   const headers = new Headers(init.headers);
   if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
-    headers.set('x-csrf-token', readCookie('tf_csrf') ?? (await fetchCsrf()));
+    headers.set('x-csrf-token', readDecodedCookie('tf_csrf') ?? (await fetchCsrf()));
   }
   if (init.body && !(init.body instanceof FormData))
     headers.set('content-type', 'application/json');
