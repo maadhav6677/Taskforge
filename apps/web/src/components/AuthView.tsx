@@ -11,10 +11,20 @@ interface Credentials {
   password: string;
 }
 
+const loginDefaults: Credentials = {
+  email: 'user@taskforge.local',
+  password: 'TaskForge123!',
+};
+
+const registerDefaults: Credentials = {
+  email: '',
+  password: '',
+};
+
 export function AuthView({ onAuthenticated }: { onAuthenticated: (user: User) => void }) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
-  const { register, handleSubmit, formState } = useForm<Credentials>({
-    defaultValues: { email: 'user@taskforge.local', password: 'TaskForge123!' },
+  const { register, handleSubmit, formState, reset } = useForm<Credentials>({
+    defaultValues: loginDefaults,
   });
   const mutation = useMutation({
     mutationFn: (values: Credentials) =>
@@ -24,6 +34,12 @@ export function AuthView({ onAuthenticated }: { onAuthenticated: (user: User) =>
       }),
     onSuccess: (result) => onAuthenticated(result.data.user),
   });
+  const switchMode = () => {
+    const nextMode = mode === 'login' ? 'register' : 'login';
+    setMode(nextMode);
+    reset(nextMode === 'login' ? loginDefaults : registerDefaults);
+    mutation.reset();
+  };
 
   return (
     <main className="auth-shell">
@@ -73,10 +89,7 @@ export function AuthView({ onAuthenticated }: { onAuthenticated: (user: User) =>
             {mutation.isPending ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}
           </button>
         </form>
-        <button
-          className="text-button"
-          onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
-        >
+        <button className="text-button" onClick={switchMode}>
           {mode === 'login' ? 'Need an account? Register' : 'Already registered? Sign in'}
         </button>
         <p className="demo-hint">Development seed: user@taskforge.local / TaskForge123!</p>
