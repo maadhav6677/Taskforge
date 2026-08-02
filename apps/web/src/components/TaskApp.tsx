@@ -210,7 +210,7 @@ function CreateTaskPanel({
           title: values.title,
           description: values.description || undefined,
           type: 'TEXT_PROCESSING',
-          input: { text: values.text },
+          input: { schemaVersion: 1, text: values.text },
           scheduledAt: values.scheduledAt ? new Date(values.scheduledAt).toISOString() : undefined,
           maxAttempts: 3,
         }),
