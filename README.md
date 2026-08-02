@@ -44,4 +44,4 @@ pnpm --filter @taskforge/api start:worker:dev
 pnpm start:web
 ```
 
-The API exposes liveness at `http://localhost:4000/api/v1/health/live` and the current readiness shell at `http://localhost:4000/api/v1/health/ready`. PostgreSQL, Redis, queue, and business features are introduced in later delivery phases.
+The API exposes liveness at `http://localhost:4000/api/v1/health/live`. The current readiness shell at `http://localhost:4000/api/v1/health/ready` intentionally returns `503 SERVICE_NOT_READY` until bounded PostgreSQL and Redis checks are integrated. PostgreSQL, Redis, queue, and business features are introduced in later delivery phases.

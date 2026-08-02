@@ -1,14 +1,7 @@
 import { Router } from 'express';
 import { healthSuccess } from '../../shared/contract.js';
-import type { ServiceHealth } from '../../shared/contract.js';
 import { toErrorResponse, toSuccessResponse } from '../../shared/http.js';
 import type { Request, Response } from 'express';
-
-const dependencyState: ServiceHealth['dependencies'] = {
-  redis: 'unchecked',
-  postgres: 'unchecked',
-  queue: 'unchecked',
-};
 
 export const createHealthRouter = () => {
   const router = Router();
@@ -24,17 +17,11 @@ export const createHealthRouter = () => {
   });
 
   router.get('/health/ready', (req: Request, res: Response) => {
-    const apiReadyPayload = {
-      status: 'ready',
-      version: '0.1.0',
-      checkedAt: new Date().toISOString(),
-      dependencies: {
-        ...dependencyState,
-        redis: 'unchecked',
-      },
-    };
-
-    res.status(200).json(toSuccessResponse(req, apiReadyPayload, { basePath: '/api/v1' }));
+    res
+      .status(503)
+      .json(
+        toErrorResponse(req, 'SERVICE_NOT_READY', 'The service is not ready to receive traffic.'),
+      );
   });
 
   router.get('/docs', (req, res) => {

@@ -160,7 +160,7 @@ Compose will run `web`, `api`, `worker`, `postgres`, and `redis`, plus named dat
 Operational requirements:
 
 - `/health/live` for process liveness.
-- `/health/ready` for bounded PostgreSQL/Redis readiness.
+- `/health/ready` returns `200` only after bounded PostgreSQL/Redis checks succeed; unavailable or not-yet-integrated checks return `503`.
 - Pino logs with request/task/job/execution identifiers and redaction.
 - Graceful HTTP, worker, Prisma, and Redis shutdown.
 
