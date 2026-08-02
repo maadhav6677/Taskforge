@@ -52,13 +52,7 @@ export const toErrorResponse = (
 });
 
 export const notFoundHandler = (req: Request, res: Response): void => {
-  res.status(404).json(
-    toErrorResponse(
-      req,
-      'NOT_FOUND',
-      `Cannot ${req.method} ${req.path}`,
-    ),
-  );
+  res.status(404).json(toErrorResponse(req, 'NOT_FOUND', `Cannot ${req.method} ${req.path}`));
 };
 
 export const errorHandler = (

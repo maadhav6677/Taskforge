@@ -8,16 +8,12 @@ const baseRules = {
 };
 
 module.exports = [
+  {
+    ignores: ['**/node_modules/**', '**/dist/**', '**/.next/**', '**/coverage/**'],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    ignores: [
-      '**/node_modules/**',
-      '**/dist/**',
-      '**/.next/**',
-      '**/coverage/**',
-      '*.md',
-    ],
     files: ['**/*.{js,mjs,cjs,ts,tsx}'],
     languageOptions: {
       ecmaVersion: 'latest',

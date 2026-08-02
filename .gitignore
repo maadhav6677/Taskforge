@@ -9,12 +9,14 @@ node_modules/
 dist/
 .next/
 coverage/
+*.tsbuildinfo
 pnpm-debug.log*
 *.pem
 
 # Environment and runtime
 .env
 .DS_Store
+apps/web/next-env.d.ts
 
 # Storage and temporary files
 storage/

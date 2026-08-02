@@ -1,8 +1,8 @@
 import type { Request, Response } from 'express';
-import pinoHttp from 'pino-http';
+import { pinoHttp } from 'pino-http';
 import { logger } from './logger.js';
 
-export const requestLogger = pinoHttp({
+export const requestLogger = pinoHttp<Request, Response>({
   logger,
   customProps: (req: Request) => ({ requestId: req.requestId }),
   serializers: {

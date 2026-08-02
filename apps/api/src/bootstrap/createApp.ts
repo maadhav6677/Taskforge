@@ -4,9 +4,7 @@ import helmet from 'helmet';
 import { env } from '../config/env.js';
 import { requestIdMiddleware } from '../infrastructure/request-id.js';
 import { requestLogger } from '../infrastructure/request-logger.js';
-import {
-  createHealthRouter,
-} from '../modules/health/health.routes.js';
+import { createHealthRouter } from '../modules/health/health.routes.js';
 import { errorHandler, notFoundHandler } from '../shared/http.js';
 
 const parseAllowedOrigins = (origins: string): string[] =>

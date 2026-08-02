@@ -5,15 +5,24 @@ import { logger } from '../infrastructure/logger.js';
 
 export const startApi = async (): Promise<void> => {
   const app = createApp();
-  const server: Server = app.listen(env.API_PORT, () => {
-    logger.info(
-      {
-        port: env.API_PORT,
-        basePath: env.API_BASE_PATH,
-      },
-      'TaskForge API started',
-    );
+  const server = await new Promise<Server>((resolve, reject) => {
+    const listeningServer = app.listen(env.API_PORT, (error?: Error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve(listeningServer);
+    });
   });
+
+  logger.info(
+    {
+      port: env.API_PORT,
+      basePath: env.API_BASE_PATH,
+    },
+    'TaskForge API started',
+  );
 
   const close = async (): Promise<void> => {
     await new Promise<void>((resolve, reject) =>
@@ -34,7 +43,7 @@ export const startApi = async (): Promise<void> => {
       logger.info('API shutdown complete');
       process.exit(0);
     } catch (error) {
-      logger.error({ error }, 'API shutdown failed');
+      logger.error({ err: error }, 'API shutdown failed');
       process.exit(1);
     }
   };
