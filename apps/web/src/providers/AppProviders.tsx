@@ -8,7 +8,15 @@ import { makeStore } from '../store/store';
 
 export function AppProviders({ children }: { children: ReactNode }) {
   const [store] = useState(makeStore);
-  const [queryClient] = useState(() => new QueryClient());
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: { retry: 1, staleTime: 15_000, refetchOnWindowFocus: true },
+          mutations: { retry: false },
+        },
+      }),
+  );
 
   return (
     <Provider store={store}>
