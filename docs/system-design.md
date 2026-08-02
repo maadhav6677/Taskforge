@@ -137,6 +137,9 @@ Controllers/routes translate HTTP only: Zod input, service call, status/header/e
 
 - `tasks.row_version` backs `If-Match`; update/delete/retry use owner, ID, expected version, allowed status, and `deleted_at IS NULL` in one predicate.
 - `execution_version` changes only on manual retry and is embedded in job identity.
+- Persisted task input and result objects carry `schemaVersion: 1`; shared runtime contracts normalize
+  accepted task input before persistence and reject unsupported versions. Attachment metadata remains
+  relational rather than being duplicated in task JSON.
 - `claimPending` is a conditional `PENDING -> PROCESSING` update; one duplicate delivery can win.
 - Each transition inserts its event in the same database transaction as the snapshot change.
 - Active owner/status/time indexes serve lists; `pg_trgm` GIN indexes serve bounded title/description search.
@@ -154,7 +157,7 @@ Controllers/routes translate HTTP only: Zod input, service call, status/header/e
 | State               | Owner                 | Examples                                  |
 | ------------------- | --------------------- | ----------------------------------------- |
 | Server state        | TanStack Query        | session, counts, task list/detail/history |
-| URL state           | URL search parameters | search and status filter                  |
+| URL state           | URL search parameters | search, status, sort, and page            |
 | Client global state | Redux Toolkit         | create panel and selected task            |
 | Local form state    | React Hook Form       | credentials and task draft                |
 

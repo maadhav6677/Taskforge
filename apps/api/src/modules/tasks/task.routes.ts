@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import multer from 'multer';
+import { fileInspectionInputSchema, textTaskInputSchema } from '@taskforge/contracts';
 import { env } from '../../config/env.js';
 import { prisma } from '../../infrastructure/database/prisma.js';
 import { HttpError, toSuccessResponse } from '../../shared/http.js';
@@ -21,7 +22,8 @@ import {
 
 const taskIdSchema = z.object({ id: z.string().uuid() });
 const taskStatuses = ['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED'] as const;
-const textInputSchema = z.object({ text: z.string().min(1).max(2_000) }).strict();
+const taskTypes = ['TEXT_PROCESSING', 'FILE_INSPECTION'] as const;
+const taskSortFields = ['createdAt', 'updatedAt', 'scheduledAt', 'status', 'title'] as const;
 const createSchema = z
   .discriminatedUnion('type', [
     z
@@ -29,7 +31,7 @@ const createSchema = z
         title: z.string().trim().min(1).max(160),
         description: z.string().trim().max(2_000).optional(),
         type: z.literal('TEXT_PROCESSING'),
-        input: textInputSchema,
+        input: textTaskInputSchema,
         scheduledAt: z.string().datetime({ offset: true }).optional(),
         maxAttempts: z.number().int().min(1).max(5).default(3),
       })
@@ -39,7 +41,7 @@ const createSchema = z
         title: z.string().trim().min(1).max(160),
         description: z.string().trim().max(2_000).optional(),
         type: z.literal('FILE_INSPECTION'),
-        input: z.object({}).strict().default({}),
+        input: fileInspectionInputSchema.default({}),
         scheduledAt: z.string().datetime({ offset: true }).optional(),
         maxAttempts: z.number().int().min(1).max(5).default(3),
       })
@@ -58,7 +60,7 @@ const updateSchema = z
   .object({
     title: z.string().trim().min(1).max(160).optional(),
     description: z.string().trim().max(2_000).nullable().optional(),
-    input: textInputSchema.optional(),
+    input: textTaskInputSchema.optional(),
     scheduledAt: z.string().datetime({ offset: true }).nullable().optional(),
   })
   .strict()
@@ -76,10 +78,26 @@ const listSchema = z
   .object({
     q: z.string().trim().max(160).optional(),
     status: z.enum(taskStatuses).optional(),
+    type: z.enum(taskTypes).optional(),
+    scheduled: z
+      .enum(['true', 'false'])
+      .transform((value) => value === 'true')
+      .optional(),
+    createdFrom: z.string().datetime({ offset: true }).optional(),
+    createdTo: z.string().datetime({ offset: true }).optional(),
+    sortBy: z.enum(taskSortFields).default('createdAt'),
+    sortOrder: z.enum(['asc', 'desc']).default('desc'),
     page: z.coerce.number().int().positive().default(1),
     pageSize: z.coerce.number().int().positive().max(50).default(20),
   })
-  .strict();
+  .strict()
+  .refine(
+    (value) =>
+      !value.createdFrom ||
+      !value.createdTo ||
+      new Date(value.createdFrom).getTime() <= new Date(value.createdTo).getTime(),
+    { path: ['createdTo'], message: 'createdTo must not be earlier than createdFrom.' },
+  );
 
 const parseExpectedVersion = (header: string | undefined): number => {
   const normalized = header?.replace(/^W\//, '').replaceAll('"', '');
@@ -226,11 +244,21 @@ export const createTaskRouter = () => {
         limit: query.pageSize,
         ...(query.q ? { search: query.q } : {}),
         ...(query.status ? { status: query.status } : {}),
+        ...(query.type ? { type: query.type } : {}),
+        ...(query.scheduled !== undefined ? { scheduled: query.scheduled } : {}),
+        ...(query.createdFrom ? { createdFrom: new Date(query.createdFrom) } : {}),
+        ...(query.createdTo ? { createdTo: new Date(query.createdTo) } : {}),
+        sortBy: query.sortBy,
+        sortOrder: query.sortOrder,
       }),
       repository.countOwned({
         ownerId: req.auth!.sub,
         ...(query.q ? { search: query.q } : {}),
         ...(query.status ? { status: query.status } : {}),
+        ...(query.type ? { type: query.type } : {}),
+        ...(query.scheduled !== undefined ? { scheduled: query.scheduled } : {}),
+        ...(query.createdFrom ? { createdFrom: new Date(query.createdFrom) } : {}),
+        ...(query.createdTo ? { createdTo: new Date(query.createdTo) } : {}),
       }),
     ]);
     res.json(
@@ -251,9 +279,19 @@ export const createTaskRouter = () => {
     const { id } = taskIdSchema.parse(req.params);
     const task = await repository.findOwnedById(req.auth!.sub, id);
     if (!task) throw new HttpError(404, 'TASK_NOT_FOUND', 'The task was not found.');
-    res
-      .set('ETag', `"${task.version}"`)
-      .json(toSuccessResponse(req, { task: serializeTask(task) }));
+    const attachments = await fileRepository.listForTask(task.id);
+    res.set('ETag', `"${task.version}"`).json(
+      toSuccessResponse(req, {
+        task: serializeTask(task),
+        attachments: attachments.map((file) => ({
+          id: file.id,
+          originalName: file.originalName,
+          mimeType: file.mimeType,
+          sizeBytes: Number(file.sizeBytes),
+          sha256: file.sha256,
+        })),
+      }),
+    );
   });
 
   router.patch('/:id', async (req, res) => {

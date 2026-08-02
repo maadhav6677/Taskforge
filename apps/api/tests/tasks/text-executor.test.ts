@@ -3,6 +3,7 @@ import { executeTextTask, TextExecutionError } from '../../src/modules/tasks/tex
 describe('text task executor', () => {
   it('returns deterministic normalized analysis', () => {
     expect(executeTextTask({ text: '  TaskForge   stays truthful.  ' })).toEqual({
+      schemaVersion: 1,
       normalized: 'TaskForge stays truthful.',
       uppercase: 'TASKFORGE STAYS TRUTHFUL.',
       wordCount: 3,

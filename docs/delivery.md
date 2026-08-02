@@ -32,7 +32,12 @@ Deployment is the first item dropped if reliability is uncertain.
 
 Update phase status here only when its gate passes. File creation alone is not completion.
 
-The current working tree implements the prototype scope across Phases 0–10. Phases 0–2 gates and the real PostgreSQL/Redis/BullMQ integration gate pass locally. The remaining table gates are retained as release criteria: do not describe manual accessibility, browser E2E, outage matrices, public CI execution, video, or deployment as complete until their evidence exists.
+The current working tree implements the prototype scope across Phases 0–10. Local verification proves
+the root quality gate, 20 unit/component/contract tests, 17 real PostgreSQL/Redis/BullMQ integration
+tests, fresh migration and deterministic seed behavior, production image builds, and a healthy Compose
+runtime for web, API, worker, PostgreSQL, and Redis. The remaining table gates are retained as release
+criteria: do not describe manual accessibility, browser E2E, outage matrices, public CI execution,
+video, or deployment as complete until their evidence exists.
 
 ## Milestone details
 

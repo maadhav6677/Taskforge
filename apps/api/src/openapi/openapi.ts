@@ -84,6 +84,24 @@ export const openApiDocument = {
         parameters: [
           { name: 'q', in: 'query', schema: { type: 'string', maxLength: 160 } },
           { name: 'status', in: 'query', schema: { $ref: '#/components/schemas/TaskStatus' } },
+          { name: 'type', in: 'query', schema: { $ref: '#/components/schemas/TaskType' } },
+          { name: 'scheduled', in: 'query', schema: { type: 'boolean' } },
+          { name: 'createdFrom', in: 'query', schema: { type: 'string', format: 'date-time' } },
+          { name: 'createdTo', in: 'query', schema: { type: 'string', format: 'date-time' } },
+          {
+            name: 'sortBy',
+            in: 'query',
+            schema: {
+              type: 'string',
+              enum: ['createdAt', 'updatedAt', 'scheduledAt', 'status', 'title'],
+              default: 'createdAt',
+            },
+          },
+          {
+            name: 'sortOrder',
+            in: 'query',
+            schema: { type: 'string', enum: ['asc', 'desc'], default: 'desc' },
+          },
           { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1, default: 1 } },
           {
             name: 'pageSize',
@@ -126,7 +144,7 @@ export const openApiDocument = {
       parameters: [{ $ref: '#/components/parameters/TaskId' }],
       get: {
         tags: ['Tasks'],
-        summary: 'Read an owned task',
+        summary: 'Read an owned task with safe attachment metadata',
         responses: {
           '200': { description: 'Task' },
           '404': { $ref: '#/components/responses/Error' },
@@ -265,6 +283,7 @@ export const openApiDocument = {
     },
     schemas: {
       TaskStatus: { type: 'string', enum: ['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED'] },
+      TaskType: { type: 'string', enum: ['TEXT_PROCESSING', 'FILE_INSPECTION'] },
       CreateTextTask: {
         type: 'object',
         additionalProperties: false,

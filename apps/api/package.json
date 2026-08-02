@@ -13,13 +13,16 @@
     "db:migrate:dev": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "start": "node dist/apps/api/src/index.js",
+    "prestart:dev": "pnpm --filter @taskforge/contracts build",
     "start:dev": "tsx watch src/index.ts",
     "start:worker": "node dist/apps/api/src/worker.js",
+    "prestart:worker:dev": "pnpm --filter @taskforge/contracts build",
     "start:worker:dev": "tsx watch src/worker.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit && tsc -p tsconfig.integration.json --noEmit",
     "lint": "eslint src tests prisma/*.ts prisma.config.ts",
     "lint:fix": "eslint src tests prisma/*.ts prisma.config.ts --fix",
     "test": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js",
+    "pretest:integration:postgres": "pnpm --filter @taskforge/contracts build",
     "test:integration:postgres": "tsx tests/integration/run-postgres-integration.ts"
   },
   "dependencies": {

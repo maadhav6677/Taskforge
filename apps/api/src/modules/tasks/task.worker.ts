@@ -67,7 +67,7 @@ export const createTaskWorker = (tasks = new TaskRepository(prisma)) =>
               sha256,
             });
           }
-          result = { files: inspected };
+          result = { schemaVersion: 1, files: inspected };
         }
         await tasks.completeProcessing(task.id, task.executionVersion, result, new Date());
         await emitTaskStatus(task.ownerId, task.id, 'COMPLETED', task.executionVersion);

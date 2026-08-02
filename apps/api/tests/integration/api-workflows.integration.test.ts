@@ -130,6 +130,27 @@ describe('authenticated API workflows', () => {
 
     await other.get(`/api/v1/tasks/${taskId}`).expect(404);
     csrf = await establishCsrf(owner);
+    await owner
+      .post('/api/v1/tasks')
+      .set('Origin', allowedOrigin)
+      .set('x-csrf-token', csrf)
+      .send({
+        title: 'Alphabetically first',
+        type: 'TEXT_PROCESSING',
+        input: { text: 'sort this list deterministically' },
+      })
+      .expect(202);
+
+    const sorted = await owner
+      .get('/api/v1/tasks?sortBy=title&sortOrder=asc&page=1&pageSize=10')
+      .expect(200);
+    expect(sorted.body.data.tasks.map((task: { title: string }) => task.title)).toEqual([
+      'Alphabetically first',
+      'HTTP ownership fixture',
+    ]);
+    await owner.get('/api/v1/tasks?sortBy=untrustedColumn').expect(422);
+
+    csrf = await establishCsrf(owner);
     const updated = await owner
       .patch(`/api/v1/tasks/${taskId}`)
       .set('Origin', allowedOrigin)
@@ -185,6 +206,16 @@ describe('authenticated API workflows', () => {
       .expect(202);
     const attachmentId = created.body.data.attachments[0].id as string;
     expect(created.body.data.attachments[0]).toMatchObject({ mimeType: 'image/png' });
+
+    const detail = await owner.get(`/api/v1/tasks/${created.body.data.task.id}`).expect(200);
+    expect(detail.body.data.attachments).toEqual([
+      expect.objectContaining({
+        id: attachmentId,
+        originalName: 'pixel.png',
+        mimeType: 'image/png',
+      }),
+    ]);
+    expect(detail.body.data.attachments[0]).not.toHaveProperty('storageKey');
 
     const download = await owner.get(`/api/v1/files/${attachmentId}/download`).expect(200);
     expect(download.headers['content-type']).toMatch(/^image\/png/);

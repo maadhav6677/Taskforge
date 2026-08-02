@@ -6,16 +6,18 @@ export type TaskStatus = z.infer<typeof taskStatusSchema>;
 export const taskTypeSchema = z.enum(['TEXT_PROCESSING', 'FILE_INSPECTION']);
 export type TaskType = z.infer<typeof taskTypeSchema>;
 
-export const textTaskInputSchema = z.object({
-  text: z.string().min(1).max(2000),
-});
+export const textTaskInputSchema = z
+  .object({
+    schemaVersion: z.literal(1).default(1),
+    text: z.string().min(1).max(2000),
+  })
+  .strict();
 
-export const fileInspectionInputSchema = z.object({
-  storageKey: z.string().uuid(),
-  originalFileName: z.string().min(1).max(255),
-  mimeType: z.string().min(1).max(64),
-  fileSizeBytes: z.number().int().positive(),
-});
+export const fileInspectionInputSchema = z
+  .object({
+    schemaVersion: z.literal(1).default(1),
+  })
+  .strict();
 
 export const taskInputSchema = z.discriminatedUnion('type', [
   z.object({

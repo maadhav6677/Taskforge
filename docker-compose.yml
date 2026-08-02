@@ -39,6 +39,8 @@ services:
     env_file:
       - .env.example
     environment:
+      NODE_ENV: production
+      LOG_LEVEL: info
       DATABASE_URL: postgresql://taskforge:taskforge@postgres:5432/taskforge
       REDIS_URL: redis://redis:6379
     ports:
@@ -67,6 +69,8 @@ services:
     env_file:
       - .env.example
     environment:
+      NODE_ENV: production
+      LOG_LEVEL: info
       DATABASE_URL: postgresql://taskforge:taskforge@postgres:5432/taskforge
       REDIS_URL: redis://redis:6379
     volumes:
@@ -81,6 +85,8 @@ services:
       - api
     env_file:
       - .env.example
+    environment:
+      NODE_ENV: production
     ports:
       - '3000:3000'
 

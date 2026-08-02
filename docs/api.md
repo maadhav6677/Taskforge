@@ -115,6 +115,10 @@ JSON-only creation sends the schema directly. Multipart creation sends:
 
 The API returns the durable pending task with `202` because execution is separate. Temporary Redis dispatch failure remains recoverable through reconciliation.
 
+`GET /tasks/:id` returns the owned task plus safe attachment metadata (`id`, display name,
+detected MIME type, byte size, and optional SHA-256). It never returns the private storage key;
+bytes remain available only through the separately authorized download route.
+
 ## Listing
 
 | Parameter                     | Rule                                                       |
