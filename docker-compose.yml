@@ -24,6 +24,7 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+      target: api
     container_name: taskforge-api
     depends_on:
       - postgres
@@ -41,7 +42,8 @@ services:
   worker:
     build:
       context: .
-      dockerfile: apps/api/Dockerfile.worker
+      dockerfile: apps/api/Dockerfile
+      target: worker
     container_name: taskforge-worker
     depends_on:
       - postgres

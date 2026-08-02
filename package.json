@@ -22,6 +22,7 @@
     "test": "pnpm -r test",
     "build": "pnpm -r build",
     "ci:check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build",
+    "docker:check": "docker compose config --quiet && docker compose build",
     "start:api": "pnpm --filter @taskforge/api start",
     "start:web": "pnpm --filter @taskforge/web dev",
     "start:worker": "pnpm --filter @taskforge/api start:worker",

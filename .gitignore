@@ -6,6 +6,7 @@ docs/roadmap.md
 
 # Build and dependency artifacts
 node_modules/
+.pnpm-store/
 dist/
 .next/
 coverage/
@@ -15,11 +16,10 @@ pnpm-debug.log*
 
 # Environment and runtime
 .env
+.env.*
+!.env.example
 .DS_Store
-.env.local
-.env.test
-apps/api/.env.local
-.pnpm-store/
+apps/web/next-env.d.ts
 
 # Storage and temporary files
 storage/
