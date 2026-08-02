@@ -35,57 +35,57 @@ Codes are stable identifiers; validation `details` are optional and field-safe.
 
 ## Status codes
 
-| Status | Meaning |
-| ---: | --- |
-| `200` | Read/login/refresh/update succeeded |
-| `201` | Registration created user/session |
-| `202` | Async task/retry accepted |
-| `204` | Logout/delete succeeded |
-| `400` | Malformed transport |
-| `401` | Authentication invalid/expired/revoked |
-| `403` | Role policy denied |
-| `404` | Absent or concealed out-of-scope resource |
-| `409` | Lifecycle, duplicate, or version conflict |
-| `413` | Request/file too large |
-| `422` | Invalid field values |
-| `429` | Rate limited |
-| `503` | Required infrastructure unavailable |
+| Status | Meaning                                   |
+| -----: | ----------------------------------------- |
+|  `200` | Read/login/refresh/update succeeded       |
+|  `201` | Registration created user/session         |
+|  `202` | Async task/retry accepted                 |
+|  `204` | Logout/delete succeeded                   |
+|  `400` | Malformed transport                       |
+|  `401` | Authentication invalid/expired/revoked    |
+|  `403` | Role policy denied                        |
+|  `404` | Absent or concealed out-of-scope resource |
+|  `409` | Lifecycle, duplicate, or version conflict |
+|  `413` | Request/file too large                    |
+|  `422` | Invalid field values                      |
+|  `429` | Rate limited                              |
+|  `503` | Required infrastructure unavailable       |
 
 ## Endpoints
 
 ### Authentication
 
-| Method | Path | Purpose | Success |
-| --- | --- | --- | ---: |
-| `POST` | `/auth/register` | Create `USER` and initial session | `201` |
-| `POST` | `/auth/login` | Verify credentials/create session | `200` |
-| `POST` | `/auth/refresh` | Rotate refresh credential/access JWT | `200` |
-| `POST` | `/auth/logout` | Revoke session/clear cookies | `204` |
-| `GET` | `/auth/me` | Restore current user presentation | `200` |
+| Method | Path             | Purpose                              | Success |
+| ------ | ---------------- | ------------------------------------ | ------: |
+| `POST` | `/auth/register` | Create `USER` and initial session    |   `201` |
+| `POST` | `/auth/login`    | Verify credentials/create session    |   `200` |
+| `POST` | `/auth/refresh`  | Rotate refresh credential/access JWT |   `200` |
+| `POST` | `/auth/logout`   | Revoke session/clear cookies         |   `204` |
+| `GET`  | `/auth/me`       | Restore current user presentation    |   `200` |
 
 ### User resources
 
-| Method | Path | Purpose | Success |
-| --- | --- | --- | ---: |
-| `GET` | `/dashboard/summary` | Owned counts, recent/queue context | `200` |
-| `POST` | `/tasks` | Create immediate/scheduled task | `202` |
-| `GET` | `/tasks` | Search/filter/sort/paginate owned tasks | `200` |
-| `GET` | `/tasks/:id` | Task/result/attachment metadata | `200` |
-| `PATCH` | `/tasks/:id` | Update eligible pending task | `200` |
-| `DELETE` | `/tasks/:id` | Cancel if pending and soft-delete | `204` |
-| `POST` | `/tasks/:id/retry` | New execution from failed task | `202` |
-| `GET` | `/tasks/:id/history` | Paginated events | `200` |
-| `GET` | `/files/:id/download` | Authorized attachment stream | `200` |
+| Method   | Path                  | Purpose                                 | Success |
+| -------- | --------------------- | --------------------------------------- | ------: |
+| `GET`    | `/dashboard/summary`  | Owned counts, recent/queue context      |   `200` |
+| `POST`   | `/tasks`              | Create immediate/scheduled task         |   `202` |
+| `GET`    | `/tasks`              | Search/filter/sort/paginate owned tasks |   `200` |
+| `GET`    | `/tasks/:id`          | Task/result/attachment metadata         |   `200` |
+| `PATCH`  | `/tasks/:id`          | Update eligible pending task            |   `200` |
+| `DELETE` | `/tasks/:id`          | Cancel if pending and soft-delete       |   `204` |
+| `POST`   | `/tasks/:id/retry`    | New execution from failed task          |   `202` |
+| `GET`    | `/tasks/:id/history`  | Paginated events                        |   `200` |
+| `GET`    | `/files/:id/download` | Authorized attachment stream            |   `200` |
 
 ### Admin and operations
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/admin/dashboard/summary` | System aggregates/queue summary |
-| `GET` | `/admin/tasks` | Global task list |
-| `GET` | `/health/live` | Process liveness |
-| `GET` | `/health/ready` | PostgreSQL/Redis readiness |
-| `GET` | `/docs`, `/openapi.json` | Protected/development API docs |
+| Method | Path                       | Purpose                         |
+| ------ | -------------------------- | ------------------------------- |
+| `GET`  | `/admin/dashboard/summary` | System aggregates/queue summary |
+| `GET`  | `/admin/tasks`             | Global task list                |
+| `GET`  | `/health/live`             | Process liveness                |
+| `GET`  | `/health/ready`            | PostgreSQL/Redis readiness      |
+| `GET`  | `/docs`, `/openapi.json`   | Protected/development API docs  |
 
 Initial admin scope is read-only; admin mutations require new audit/product rules.
 
@@ -111,14 +111,14 @@ The API returns the durable pending task with `202` because execution is separat
 
 ## Listing
 
-| Parameter | Rule |
-| --- | --- |
-| `q` | Bounded title/description search |
-| `status`, `type`, `scheduled` | Allowlisted filters |
-| `createdFrom`, `createdTo` | Valid UTC range |
-| `sortBy` | `createdAt`, `updatedAt`, `scheduledAt`, `status`, `title` |
-| `sortOrder` | `asc` or `desc` |
-| `page`, `pageSize` | Positive; defaults 1/20; max page size 50 |
+| Parameter                     | Rule                                                       |
+| ----------------------------- | ---------------------------------------------------------- |
+| `q`                           | Bounded title/description search                           |
+| `status`, `type`, `scheduled` | Allowlisted filters                                        |
+| `createdFrom`, `createdTo`    | Valid UTC range                                            |
+| `sortBy`                      | `createdAt`, `updatedAt`, `scheduledAt`, `status`, `title` |
+| `sortOrder`                   | `asc` or `desc`                                            |
+| `page`, `pageSize`            | Positive; defaults 1/20; max page size 50                  |
 
 Unknown fields are rejected and all sorts add an ID tie-breaker. Metadata returns page, page size, total items, and total pages.
 

@@ -2,9 +2,9 @@
 
 ## Mission and current state
 
-Build TaskForge as a recruiter-reviewed, production-minded task automation platform. Prefer correct, explicit, maintainable code over feature volume or decorative complexity.
+Build TaskForge as a production-minded task automation platform. Prefer correct, explicit, maintainable code over feature volume or decorative complexity.
 
-The repository is currently documentation-only. Do not assume commands, dependencies, or generated artifacts exist until they appear in the working tree.
+Do not assume commands, dependencies, or generated artifacts exist until they appear in the working tree.
 
 ## Read before changing
 
@@ -46,15 +46,15 @@ After scaffolding, canonical root scripts must cover format, lint, strict typech
 
 Update the owning document in the same change:
 
-| Change | Authority |
-| --- | --- |
-| Scope or product behavior | `docs/requirements.md` |
-| Runtime/module/data flow | `docs/architecture.md`; rationale in `docs/decisions.md` |
-| Endpoint or error contract | `docs/api.md` and generated OpenAPI when available |
-| Schema, constraint, index, or migration | `docs/database.md` |
-| Security control | `docs/security.md` |
-| Convention or test policy | `docs/coding-style.md` |
-| Phase status | `docs/delivery.md` |
+| Change                                  | Authority                                                |
+| --------------------------------------- | -------------------------------------------------------- |
+| Scope or product behavior               | `docs/requirements.md`                                   |
+| Runtime/module/data flow                | `docs/architecture.md`; rationale in `docs/decisions.md` |
+| Endpoint or error contract              | `docs/api.md` and generated OpenAPI when available       |
+| Schema, constraint, index, or migration | `docs/database.md`                                       |
+| Security control                        | `docs/security.md`                                       |
+| Convention or test policy               | `docs/coding-style.md`                                   |
+| Phase status                            | `docs/delivery.md`                                       |
 
 ## Git and completion
 

@@ -23,16 +23,16 @@ The assessment values architecture, production-quality code, and clear decisions
 
 ## Required stack
 
-| Concern | Choice |
-| --- | --- |
-| Web | Next.js 16, React 19, strict TypeScript, responsive components |
-| Browser state | Redux Toolkit for client state; TanStack Query for server state |
-| API | Node.js 24 LTS, Express, versioned REST |
-| Data | PostgreSQL 18, Prisma, migrations, deterministic seed |
-| Jobs | BullMQ on Redis; separate asynchronous worker |
-| Redis | Queue, refresh sessions, hot-read cache, rate limits, status Pub/Sub |
-| Auth | Access JWT, refresh flow, Admin/User RBAC, password hashing |
-| Delivery | Dockerfiles, Compose, public GitHub repository |
+| Concern       | Choice                                                               |
+| ------------- | -------------------------------------------------------------------- |
+| Web           | Next.js 16, React 19, strict TypeScript, responsive components       |
+| Browser state | Redux Toolkit for client state; TanStack Query for server state      |
+| API           | Node.js 24 LTS, Express, versioned REST                              |
+| Data          | PostgreSQL 18, Prisma, migrations, deterministic seed                |
+| Jobs          | BullMQ on Redis; separate asynchronous worker                        |
+| Redis         | Queue, refresh sessions, hot-read cache, rate limits, status Pub/Sub |
+| Auth          | Access JWT, refresh flow, Admin/User RBAC, password hashing          |
+| Delivery      | Dockerfiles, Compose, public GitHub repository                       |
 
 PostgreSQL and Next.js are explicitly preferred assessment options. Details and rejected alternatives live in [decisions.md](decisions.md).
 
