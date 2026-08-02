@@ -1,9 +1,8 @@
 /** @type {import('jest').Config} */
 module.exports = {
-  displayName: 'api',
-  roots: ['<rootDir>/tests'],
-  testMatch: ['<rootDir>/tests/**/*.test.ts'],
-  testPathIgnorePatterns: ['<rootDir>/tests/integration/'],
+  displayName: 'api-postgres-integration',
+  roots: ['<rootDir>/tests/integration'],
+  testMatch: ['<rootDir>/tests/integration/**/*.integration.test.ts'],
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
@@ -13,10 +12,11 @@ module.exports = {
     '^.+\\.[tj]sx?$': [
       'ts-jest',
       {
-        tsconfig: './tsconfig.test.json',
+        tsconfig: './tsconfig.integration.json',
         useESM: true,
       },
     ],
   },
   testEnvironment: 'node',
+  maxWorkers: 1,
 };

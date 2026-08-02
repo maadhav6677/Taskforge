@@ -9,6 +9,7 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "argon2",
       "esbuild",
       "sharp"
     ]
@@ -18,10 +19,14 @@
     "lint:fix": "pnpm -r lint:fix",
     "format": "prettier --cache --write .",
     "format:check": "prettier --check .",
+    "db:generate": "pnpm --filter @taskforge/api db:generate",
+    "db:migrate": "pnpm --filter @taskforge/api db:migrate:deploy",
+    "db:seed": "pnpm --filter @taskforge/api db:seed",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
+    "test:integration:postgres": "pnpm --filter @taskforge/api test:integration:postgres",
     "build": "pnpm -r build",
-    "ci:check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build",
+    "ci:check": "pnpm db:generate && pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build",
     "docker:check": "docker compose config --quiet && docker compose build",
     "start:api": "pnpm --filter @taskforge/api start",
     "start:web": "pnpm --filter @taskforge/web dev",

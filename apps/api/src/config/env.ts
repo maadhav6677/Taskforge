@@ -13,6 +13,18 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   REQUEST_ID_HEADER: z.string().default('x-request-id'),
   API_HEALTH_TIMEOUT_MS: z.coerce.number().int().positive().default(250),
+  DATABASE_URL: z.string().url(),
+  REDIS_URL: z.string().url(),
+  JWT_ACCESS_SECRET: z.string().min(32),
+  JWT_REFRESH_SECRET: z.string().min(32),
+  JWT_ISSUER: z.string().min(1).default('taskforge-api'),
+  JWT_AUDIENCE: z.string().min(1).default('taskforge-web'),
+  COOKIE_SECURE: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+  CSRF_HEADER: z.string().min(1).default('x-csrf-token'),
+  TASK_FILE_STORAGE_PATH: z.string().min(1).default('./storage/tasks'),
   TASK_MAX_FILE_SIZE_BYTES: z.coerce.number().int().positive().default(8_388_608),
   TASK_MAX_FILES: z.coerce.number().int().positive().default(5),
   JWT_ACCESS_TTL: z.coerce

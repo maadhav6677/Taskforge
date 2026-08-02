@@ -9,7 +9,13 @@ const baseRules = {
 
 module.exports = [
   {
-    ignores: ['**/node_modules/**', '**/dist/**', '**/.next/**', '**/coverage/**'],
+    ignores: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/.next/**',
+      '**/coverage/**',
+      'apps/api/src/generated/prisma/**',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
