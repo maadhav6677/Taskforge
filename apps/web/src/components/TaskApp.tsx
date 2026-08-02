@@ -8,6 +8,7 @@ import { apiRequest } from '../lib/api';
 import type { RootState } from '../store/store';
 import { setCreatePanelOpen, setSelectedTaskId } from '../store/uiSlice';
 import type { Task, TaskEvent, TaskStatus, User } from '../lib/types';
+import { io } from 'socket.io-client';
 
 interface CreateValues {
   title: string;
@@ -41,6 +42,24 @@ export function TaskApp({ user, onLogout }: { user: User; onLogout: () => void }
     if (status !== 'ALL') params.set('status', status);
     window.history.replaceState(null, '', params.size ? `?${params}` : window.location.pathname);
   }, [search, status]);
+
+  useEffect(() => {
+    const socket = io(process.env.NEXT_PUBLIC_API_ORIGIN ?? 'http://localhost:4000', {
+      withCredentials: true,
+      transports: ['websocket', 'polling'],
+    });
+    socket.on('task.status.changed', () => {
+      void queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      void queryClient.invalidateQueries({ queryKey: ['history'] });
+    });
+    socket.on('connect', () => {
+      void queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    });
+    return () => {
+      socket.disconnect();
+    };
+  }, [queryClient]);
 
   const summary = useQuery({
     queryKey: ['dashboard'],
