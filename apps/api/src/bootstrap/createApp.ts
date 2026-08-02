@@ -11,6 +11,7 @@ import { requireCsrf } from '../modules/auth/auth.middleware.js';
 import { createTaskRouter } from '../modules/tasks/task.routes.js';
 import { createDashboardRouter } from '../modules/dashboard/dashboard.routes.js';
 import { createAdminRouter } from '../modules/admin/admin.routes.js';
+import { createFileRouter } from '../modules/files/file.routes.js';
 import { errorHandler, notFoundHandler } from '../shared/http.js';
 
 const parseAllowedOrigins = (origins: string): string[] =>
@@ -54,6 +55,7 @@ export const createApp = () => {
   app.use(`${env.API_BASE_PATH}/tasks`, createTaskRouter());
   app.use(`${env.API_BASE_PATH}/dashboard`, createDashboardRouter());
   app.use(`${env.API_BASE_PATH}/admin`, createAdminRouter());
+  app.use(`${env.API_BASE_PATH}/files`, createFileRouter());
 
   app.use(notFoundHandler);
   app.use(errorHandler);

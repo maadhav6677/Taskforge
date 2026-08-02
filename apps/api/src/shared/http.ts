@@ -63,6 +63,14 @@ export const errorHandler = (
 ): void => {
   const requestId = req.requestId ?? 'unknown';
 
+  if (error.name === 'MulterError') {
+    res.status(413).json({
+      error: { code: 'UPLOAD_LIMIT_EXCEEDED', message: 'The upload exceeds configured limits.' },
+      requestId,
+    } satisfies ApiErrorResponse);
+    return;
+  }
+
   if (error instanceof HttpError) {
     res.status(error.statusCode).json({
       error: {

@@ -9,6 +9,8 @@ import {
 import { logger } from '../../infrastructure/logger.js';
 import { TaskRepository } from './task.repository.js';
 import { executeTextTask } from './text.executor.js';
+import { FileRepository } from '../files/file.repository.js';
+import { FileStorage } from '../files/file.storage.js';
 
 export const createTaskWorker = (tasks = new TaskRepository(prisma)) =>
   new Worker<TaskJob>(
@@ -29,7 +31,21 @@ export const createTaskWorker = (tasks = new TaskRepository(prisma)) =>
         if (task.type === 'TEXT_PROCESSING') {
           result = executeTextTask(task.input);
         } else {
-          throw new Error('Unsupported task type for this worker phase.');
+          const files = new FileRepository(prisma);
+          const storage = new FileStorage();
+          const attachments = await files.listForTask(task.id);
+          const inspected = [];
+          for (const attachment of attachments) {
+            const sha256 = await storage.sha256(attachment.storageKey);
+            await files.setSha256(attachment.id, sha256);
+            inspected.push({
+              id: attachment.id,
+              mimeType: attachment.mimeType,
+              sizeBytes: Number(attachment.sizeBytes),
+              sha256,
+            });
+          }
+          result = { files: inspected };
         }
         await tasks.completeProcessing(task.id, task.executionVersion, result, new Date());
         return result;
