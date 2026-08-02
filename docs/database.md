@@ -1,6 +1,6 @@
 # Database design
 
-**Status:** Proposed; migrations pending
+**Status:** Persistence baseline and task lifecycle repositories implemented
 
 PostgreSQL is authoritative for identity, task state/history, results, and attachment metadata. Redis/BullMQ state never becomes the only explanation for user-visible behavior.
 
@@ -87,6 +87,11 @@ Events are product concepts, not raw BullMQ event names.
 - `row_version >= 1` increments on accepted browser-facing mutation.
 - Nullable `deleted_at` provides soft deletion.
 
+The migration bounds titles to 160 characters, descriptions to 2,000 characters, attempts to
+1–10, and requires input/result JSON to be objects. Named checks also keep error/dispatch fields
+paired, reject impossible lifecycle timestamp ordering, and require each status snapshot to have
+the appropriate result, error, and timestamps.
+
 Searchable lifecycle data remains in columns; JSONB is limited to type-specific versioned input/result.
 
 ### `task_events`
@@ -94,12 +99,16 @@ Searchable lifecycle data remains in columns; JSONB is limited to type-specific 
 - Append-only, bigint ordered ID, required task/execution version.
 - Records type, optional status transition, attempt, small safe metadata, and UTC occurrence.
 - Never stores secrets, raw files, or stack traces.
+- A PostgreSQL trigger rejects `UPDATE` and `DELETE`; corrections append a new event.
 
 ### `file_attachments`
 
 - Belongs to one task; authorization joins through task owner.
 - Original name is display-only; opaque unique storage key is the path identity.
 - Server-detected MIME, positive bounded size, and nullable inspection checksum.
+- The initial database bound is 8 MiB and SHA-256 values must be lowercase 64-character hex.
+  The cross-row maximum attachment count remains a Phase 6 service transaction rule because a
+  row `CHECK` constraint cannot safely count sibling records.
 
 ## Constraints and indexes
 
@@ -112,13 +121,17 @@ Initial query-driven indexes:
 | unique `users(email)`                              | Registration/login            |
 | `tasks(owner_id, deleted_at, created_at DESC, id)` | Default owned list            |
 | `tasks(owner_id, status, created_at DESC, id)`     | Status filter/drill-down      |
-| `tasks(status, scheduled_at)`                      | Pending reconciliation        |
+| `tasks(status, scheduled_at)`                      | Status/schedule reads         |
+| partial `tasks(scheduled_at, id)`                  | Undispatched reconciliation   |
 | unique nullable `tasks(queue_job_id)`              | Job correlation               |
 | `task_events(task_id, occurred_at DESC, id DESC)`  | History                       |
 | `file_attachments(task_id)`                        | Detail/download authorization |
-| trigram GIN on title/description                   | Case-insensitive search       |
+| separate trigram GIN on title and description      | Case-insensitive search       |
 
-`pg_trgm` and custom indexes live in reviewed migration SQL. New indexes require a demonstrated query and consideration of write/storage cost.
+`pg_trgm` is enabled in its own reviewed migration and backs two GIN indexes used by Prisma's
+case-insensitive title/description search. The partial reconciliation index and append-only
+trigger also live in reviewed SQL because Prisma schema syntax cannot represent them. New indexes
+require a demonstrated query and consideration of write/storage cost.
 
 ## Transaction boundaries
 
@@ -146,6 +159,24 @@ Reconciliation reads bounded batches of current pending undispatched rows, adds 
 
 Seed data is deterministic/idempotent and includes one development user, one admin, and representative pending/scheduled/completed/failed tasks with consistent history. Production does not seed automatically.
 
+The committed Phase 2 history is deliberately split:
+
+1. `20260802130000_initial_schema` creates enums, tables, foreign keys, named constraints,
+   query-driven indexes, and the append-only history trigger.
+2. `20260802130100_pg_trgm_search` explicitly enables `pg_trgm` and creates the search indexes.
+
+`pnpm db:migrate` uses `prisma migrate deploy`; `db push` is not part of the workflow. The seed uses
+fixed UUIDs and timestamps, upserts the two users and four task snapshots, and inserts missing
+history events without mutating existing history. Running it repeatedly preserves the verified
+2-user, 4-task, 15-event result.
+
 ## Required integration tests
 
 Use real PostgreSQL for migration-from-empty, seed consistency, email uniqueness, ownership, list/search ordering, append-only history, soft deletion, optimistic conflicts, and conditional claim/finalization.
+
+`pnpm test:integration:postgres` implements the lifecycle. It validates that the configured name
+ends in `_test`, recreates that database, applies committed migrations, runs the serial repository
+suite, and drops only the test database in cleanup. The suite currently proves migration/extension
+state, named constraints, seed idempotence, snapshot/history agreement, ownership isolation,
+case-insensitive search, append-only history, optimistic updates, duplicate claims, finalization,
+and rejection of early scheduled work.
