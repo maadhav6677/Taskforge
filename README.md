@@ -36,6 +36,12 @@ pnpm install --frozen-lockfile
 pnpm ci:check
 ```
 
+Validate the production container definitions and build all application images:
+
+```bash
+pnpm docker:check
+```
+
 Run the Phase 1 development shells in separate terminals:
 
 ```bash

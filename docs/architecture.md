@@ -155,7 +155,7 @@ Initial private local storage is shared only by API and worker containers. The A
 
 ## Runtime topology
 
-Compose will run `web`, `api`, `worker`, `postgres`, and `redis`, plus named data/upload volumes. Images use pinned deterministic installs, multi-stage builds, non-root users, health checks, and graceful termination. Migrations run explicitly once rather than from every replica.
+Compose will run `web`, `api`, `worker`, `postgres`, and `redis`, plus named data/upload volumes. The API and worker share one multi-target Docker build, while the web runtime uses Next.js standalone output. Images use pinned deterministic installs, production-only runtime dependencies, non-root users, health checks, and graceful termination. Migrations run explicitly once rather than from every replica.
 
 Operational requirements:
 
