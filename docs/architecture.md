@@ -1,173 +1,100 @@
 # Architecture
 
-**Status:** Current runtime architecture
+TaskForge is a modular monolith with separate API and worker processes. This document explains runtime ownership and reliability; [requirements.md](requirements.md) owns product rules, [database.md](database.md) persistence, and [security.md](security.md) trust boundaries.
 
-## Purpose and ownership
+## Runtime boundaries
 
-This document defines TaskForge runtime boundaries, responsibility ownership, source-of-truth rules, and cross-process data flow. Update it when a runtime, module boundary, state owner, queue flow, cache policy, or deployment topology changes.
+| Component       | Responsibility                                                                                |
+| --------------- | --------------------------------------------------------------------------------------------- |
+| Next.js web     | Routes, responsive UI, forms, and client-side state coordination                              |
+| Express API     | HTTP translation, validation, authentication, policy, use cases, files, dispatch, and OpenAPI |
+| BullMQ worker   | Reconciliation, conditional task claims, execution, retries, and finalization                 |
+| PostgreSQL      | Durable users, task snapshots, results, attachment metadata, and append-only history          |
+| Redis           | BullMQ, refresh sessions, rate limits, short caches, and ephemeral status hints               |
+| Private storage | Attachment bytes behind a replaceable storage adapter                                         |
 
-Detailed implementation belongs in [system-design.md](system-design.md); decision rationale belongs in [decisions.md](decisions.md).
+Next.js does not implement a second business API. Redis and Socket.IO never replace PostgreSQL as product truth.
 
-## Style
-
-TaskForge is a modular monolith with two backend runtimes from the same application package:
-
-1. Express API for REST, auth, uploads, dashboard reads, and Socket.IO.
-2. BullMQ worker for dispatch reconciliation and task execution.
-
-This provides the justified process/scaling boundary without premature business microservices.
-
-```mermaid
-flowchart LR
-    Web[Next.js web]
-    API[Express API<br/>Socket.IO]
-    Worker[BullMQ worker]
-    DB[(PostgreSQL)]
-    Redis[(Redis)]
-    Files[(Private storage)]
-
-    Web -->|REST + secure cookies| API
-    Web <-->|status hints| API
-    API --> DB
-    API -->|queue, sessions, cache| Redis
-    API --> Files
-    Redis --> Worker
-    Worker --> DB
-    Worker --> Files
-    Worker -->|Pub/Sub hint| Redis
-```
-
-## Responsibilities
-
-| Runtime/service | Owns                                                                        |
-| --------------- | --------------------------------------------------------------------------- |
-| Next.js         | Routes, accessible responsive UI, TanStack Query, narrow Redux state        |
-| Express         | Validation, auth/policies, use cases, persistence, dispatch, files, OpenAPI |
-| Worker          | Reconciliation, claim, executor, attempt/result/event updates, invalidation |
-| PostgreSQL      | Users, task snapshot/history, results, attachment metadata                  |
-| Redis           | BullMQ, refresh sessions, rate limits, bounded cache, ephemeral Pub/Sub     |
-| Storage         | Private attachment bytes behind a replaceable adapter                       |
-
-Next.js route handlers/server actions do not become a second business API. Redis caches and status events never replace PostgreSQL state.
-
-## Backend modules
-
-- `auth`: credentials, tokens, sessions, revocation, auth middleware.
-- `users`: durable identity and admin-safe reads.
-- `tasks`: lifecycle policy, ownership, queries, history, retry, dispatch boundary.
-- `files`: validation, storage, metadata, cleanup, authorized download.
-- `dashboard`: scoped aggregates and cache policy.
-- `workers`: claim/finalization wrapper, executors, error classification, reconciliation.
-
-Controllers translate HTTP, services implement use cases, concrete repositories own persistence, and executors perform task work. See [coding-style.md](coding-style.md).
-
-## Repository structure
-
-```text
-apps/
-├── web/src/{app,features,components,lib,store}
-└── api/
-    ├── prisma/{schema,migrations,seed}
-    └── src/{bootstrap,common,config,infra,modules,workers}
-packages/
-└── contracts/                       # Zod wire contracts and shared enums
-docs/
-.github/workflows/
-AGENTS.md
-docker-compose.yml
-pnpm-workspace.yaml
-```
-
-Feature-private code stays in its feature. Code becomes shared only after real reuse. Shared contracts never expose Prisma/BullMQ models.
-
-## Task lifecycle
-
-The authoritative lifecycle rules are in [requirements.md](requirements.md).
-
-```mermaid
-stateDiagram-v2
-    [*] --> PENDING: create/schedule
-    PENDING --> PROCESSING: current worker claims
-    PROCESSING --> COMPLETED: success
-    PROCESSING --> PENDING: transient failure; attempts remain
-    PROCESSING --> FAILED: permanent/exhausted
-    FAILED --> PENDING: manual retry/new execution
-```
-
-One transition policy governs API and worker changes. A future execution is pending with `scheduledAt` metadata.
-
-## Queue reliability
-
-BullMQ can deliver at least once during failures:
-
-- Job ID is deterministic from task ID and execution version.
-- Worker claim conditionally changes only the matching pending, non-deleted execution.
-- Zero changed rows means stale/ineligible work; the executor does not run.
-- Finalization requires the same execution version and processing state.
-- Manual retry/reschedule increments execution version.
-
-PostgreSQL and Redis cannot share a transaction. The task row is the initial dispatch ledger:
-
-1. Commit pending task and event.
-2. Add deterministic BullMQ job, with delay if scheduled.
-3. Record dispatch metadata.
-4. If dispatch fails, keep the pending row undispatched.
-5. Worker startup/periodic reconciliation safely re-adds current undispatched work.
-
-A full outbox is deferred until multiple downstream events or irreversible integrations justify it.
-
-## Request-to-worker flow
+## System flow
 
 ```mermaid
 sequenceDiagram
-    participant Web
-    participant API
+    participant Web as Next.js
+    participant API as Express API
     participant DB as PostgreSQL
-    participant Queue as BullMQ
+    participant Queue as Redis / BullMQ
     participant Worker
 
-    Web->>API: POST task
-    API->>DB: PENDING task + CREATED event
-    API->>Queue: deterministic job + optional delay
+    Web->>API: Create immediate or scheduled task
+    API->>DB: Commit PENDING task and CREATED event
+    API->>Queue: Add deterministic job with optional delay
     API-->>Web: 202 Accepted
-    Queue-->>Worker: deliver
-    Worker->>DB: conditional PENDING -> PROCESSING
-    Worker->>Worker: execute validated task type
-    Worker->>DB: result/failure + event
-    Worker-->>Web: status hint via Redis/API
-    Web->>API: refetch canonical resources
+    Queue-->>Worker: At-least-once delivery
+    Worker->>DB: Conditionally claim current execution
+    Worker->>Worker: Validate and execute task type
+    Worker->>DB: Atomically save outcome and event
+    Worker-->>API: Publish minimal status hint
+    API-->>Web: Socket.IO invalidation hint
+    Web->>API: Refetch canonical state
 ```
+
+If dispatch fails after the database commit, the task remains pending. Startup and periodic reconciliation safely add its current deterministic job later.
+
+## Backend organization
+
+The API package is divided by business capability:
+
+- `auth`: credentials, JWTs, refresh sessions, CSRF, and auth middleware.
+- `users`: durable identity and admin-safe user access.
+- `tasks`: lifecycle policy, owned queries, history, retry, and dispatch.
+- `files`: upload validation, private storage, metadata, and authorized download.
+- `dashboard`: scoped aggregates and optional cache/queue context.
+- `admin`: explicit read-only global views.
+- worker modules: reconciliation, claims, executors, error classification, and finalization.
+
+Routes translate HTTP, services implement use cases and policy, repositories own persistence, and executors perform validated task work. Shared Zod contracts describe wire data without exposing Prisma or BullMQ models.
+
+## Reliability model
+
+BullMQ delivery is at-least-once, and PostgreSQL cannot share a transaction with Redis. TaskForge therefore uses these safeguards:
+
+1. The API commits the task snapshot and event before queue dispatch.
+2. A job ID is derived from task ID and `executionVersion`.
+3. The worker claims only a matching, pending, non-deleted execution.
+4. Finalization requires the same execution version and processing state.
+5. Automatic attempts remain inside one execution version; manual retry creates another.
+6. `rowVersion` advances for every user-visible snapshot change and backs HTTP preconditions.
+7. Reconciliation finds current pending work that lacks successful dispatch metadata.
+
+A zero-row claim or finalization means the delivery is stale or no longer eligible; the executor does not run or overwrite newer state. The task row is sufficient as the current dispatch ledger. A full outbox is deferred until the product has multiple irreversible downstream integrations.
 
 ## Frontend state ownership
 
-| State                       | Owner                       |
-| --------------------------- | --------------------------- |
-| API resources and mutations | TanStack Query              |
-| Search/filter/sort/page     | URL parameters              |
-| Auth presentation/global UI | Redux Toolkit               |
-| Form/dialog interaction     | React Hook Form/local state |
+| State                                       | Owner                          |
+| ------------------------------------------- | ------------------------------ |
+| API resources and mutations                 | TanStack Query                 |
+| Search, filters, sorting, and page          | URL parameters                 |
+| Auth presentation and client-only global UI | Redux Toolkit                  |
+| Forms and dialogs                           | React Hook Form or local state |
 
-Socket.IO carries minimal invalidation hints; reconnect/focus refetch repairs missed events.
+Socket.IO invalidates affected queries. Reconnect, focus, and bounded polling for selected active tasks repair missed events.
 
-## Caching and Redis
+## Files and caching
 
-Initial caches are scoped dashboard aggregates and hot task details with short TTLs. Task-list permutations are not cached initially. Mutations and worker transitions invalidate relevant user/admin/task keys.
+The API validates file signatures, creates opaque storage keys, and authorizes every download. API and worker share private local storage in Compose; an object-storage adapter is the production path.
 
-Compose uses one namespaced, AOF-enabled, `noeviction` Redis service with separate queue, request, publisher, and subscriber connections. Production should isolate queue Redis from cache/session workloads.
+Only bounded, short-lived data such as dashboard aggregates is cached. Mutations and worker transitions invalidate relevant keys. Cache or Pub/Sub failure must not make durable task data incorrect.
 
-## Files
+## Deployment topology
 
-Initial private local storage is shared only by API and worker containers. The API writes and authorizes downloads; workers read attachments. Opaque keys prevent user filenames becoming paths. S3-compatible storage is a later adapter, not a use-case rewrite.
+Docker Compose runs `web`, `api`, `worker`, `postgres`, and `redis`. PostgreSQL, Redis, and uploads use named volumes; only the API and worker share attachment storage. Migrations run explicitly once instead of from every application replica.
 
-## Runtime topology
+The API exposes `/health/live` for process liveness and `/health/ready` for bounded PostgreSQL and Redis readiness checks. Processes use structured redacted logs and graceful shutdown.
 
-Compose runs `web`, `api`, `worker`, `postgres`, and `redis`, plus named data/upload volumes. PostgreSQL 18 uses its version-aware `/var/lib/postgresql` volume layout and gates API/worker startup on `pg_isready`. The API and worker share one multi-target Docker build, generate the pinned Prisma client during the build, and close their database pool during graceful shutdown; the web runtime uses Next.js standalone output. Images use pinned deterministic installs, production-only runtime dependencies, non-root users, and health checks. Migrations run explicitly once rather than from every replica.
+## Key trade-offs
 
-Operational requirements:
-
-- `/health/live` for process liveness.
-- `/health/ready` returns `200` only after bounded PostgreSQL/Redis checks succeed; failed or timed-out checks return `503`.
-- Pino logs with request/task/job/execution identifiers and redaction.
-- Graceful HTTP, worker, Prisma, and Redis shutdown.
-
-Persistence details are in [database.md](database.md), security in [security.md](security.md), and rationale in [decisions.md](decisions.md).
+- **Modular monolith:** simpler transactions and local development, while API and worker still scale independently.
+- **PostgreSQL-first consistency:** durable, explainable state at the cost of reconciliation between database and queue.
+- **Local private storage:** keeps the prototype runnable but requires shared disk and is not horizontally scalable.
+- **Socket hints plus refetch:** tolerates missed events, with extra reads compared with trusting event payloads.
+- **One Redis service locally:** reduces setup; production should isolate queue workloads from cache/session pressure.

@@ -1,164 +1,97 @@
-# API contract
+# API documentation
 
-**Status:** Current HTTP and realtime contract; OpenAPI is served at `/api/v1/openapi.json`
-
-## Purpose and ownership
-
-This document describes the public API behavior used by the web application and external API clients. Update it with every endpoint, status, envelope, error code, header, cookie, pagination, upload, or realtime-event change.
-
-The served OpenAPI document is the machine-readable companion to this guide. Security policy remains authoritative in [security.md](security.md), lifecycle policy in [requirements.md](requirements.md), and persistence detail in [database.md](database.md).
+The Express API uses base path `/api/v1`. The machine-readable OpenAPI document is served at `/api/v1/openapi.json`; this file summarizes behavior that clients must understand.
 
 ## Conventions
 
-- Base path `/api/v1`; JSON by default, multipart for tasks with attachments.
-- UUID identifiers and UTC ISO 8601 timestamps.
-- Zod validates params, query, headers, bodies, multipart metadata, and documented responses.
-- Every response provides a request ID; public errors never expose dependency details or stacks.
-- Ownership and roles are enforced before revealing resource existence.
+- JSON is the default transport; task creation may use multipart form data for attachments.
+- IDs are UUIDs and timestamps are UTC ISO 8601 values.
+- Zod validates parameters, queries, headers, bodies, multipart metadata, and queue payloads.
+- Responses include a request ID. Public errors use stable codes and sanitized messages.
+- Protected resource lookup enforces role and ownership before revealing existence.
 
-### Success
-
-```json
-{ "data": {}, "meta": {}, "requestId": "uuid" }
-```
-
-`meta` is optional. `204` responses have no body and return request ID in a header.
-
-### Error
-
-```json
-{
-  "error": {
-    "code": "TASK_INVALID_TRANSITION",
-    "message": "The task cannot be updated while it is processing.",
-    "details": []
-  },
-  "requestId": "uuid"
-}
-```
-
-Codes are stable identifiers; validation `details` are optional and field-safe.
-
-## Status codes
-
-| Status | Meaning                                   |
-| -----: | ----------------------------------------- |
-|  `200` | Read/login/refresh/update succeeded       |
-|  `201` | Registration created user/session         |
-|  `202` | Async task/retry accepted                 |
-|  `204` | Logout/delete succeeded                   |
-|  `400` | Malformed transport                       |
-|  `401` | Authentication invalid/expired/revoked    |
-|  `403` | Role policy denied                        |
-|  `404` | Absent or concealed out-of-scope resource |
-|  `409` | Lifecycle, duplicate, or version conflict |
-|  `413` | Request/file too large                    |
-|  `422` | Invalid field values                      |
-|  `429` | Rate limited                              |
-|  `503` | Required infrastructure unavailable       |
+Success responses use `{ "data": ..., "meta"?: ..., "requestId": "..." }`. Errors use `{ "error": { "code": "...", "message": "...", "details"?: [...] }, "requestId": "..." }`. A `204` response has no body.
 
 ## Endpoints
 
 ### Authentication
 
-| Method | Path             | Purpose                              | Success |
-| ------ | ---------------- | ------------------------------------ | ------: |
-| `POST` | `/auth/register` | Create `USER` and initial session    |   `201` |
-| `POST` | `/auth/login`    | Verify credentials/create session    |   `200` |
-| `POST` | `/auth/refresh`  | Rotate refresh credential/access JWT |   `200` |
-| `POST` | `/auth/logout`   | Revoke session/clear cookies         |   `204` |
-| `GET`  | `/auth/me`       | Restore current user presentation    |   `200` |
+| Method | Path             | Purpose                                    |
+| ------ | ---------------- | ------------------------------------------ |
+| `GET`  | `/auth/csrf`     | Set/read the browser CSRF token            |
+| `POST` | `/auth/register` | Create a `USER` and initial session        |
+| `POST` | `/auth/login`    | Verify credentials and create a session    |
+| `POST` | `/auth/refresh`  | Rotate refresh state and issue access auth |
+| `POST` | `/auth/logout`   | Revoke the session and clear cookies       |
+| `GET`  | `/auth/me`       | Return the current user                    |
 
 ### User resources
 
-| Method   | Path                  | Purpose                                 | Success |
-| -------- | --------------------- | --------------------------------------- | ------: |
-| `GET`    | `/dashboard/summary`  | Owned counts and current queue context  |   `200` |
-| `POST`   | `/tasks`              | Create immediate/scheduled task         |   `202` |
-| `GET`    | `/tasks`              | Search/filter/sort/paginate owned tasks |   `200` |
-| `GET`    | `/tasks/:id`          | Task/result/attachment metadata         |   `200` |
-| `PATCH`  | `/tasks/:id`          | Update eligible pending task            |   `200` |
-| `DELETE` | `/tasks/:id`          | Cancel if pending and soft-delete       |   `204` |
-| `POST`   | `/tasks/:id/retry`    | New execution from failed task          |   `202` |
-| `GET`    | `/tasks/:id/history`  | Paginated events                        |   `200` |
-| `GET`    | `/files/:id/download` | Authorized attachment stream            |   `200` |
+| Method   | Path                  | Purpose                                        |
+| -------- | --------------------- | ---------------------------------------------- |
+| `GET`    | `/dashboard/summary`  | Owned task totals and queue context            |
+| `POST`   | `/tasks`              | Create an immediate or scheduled task          |
+| `GET`    | `/tasks`              | Search, filter, sort, and paginate owned tasks |
+| `GET`    | `/tasks/:id`          | Read an owned task and safe file metadata      |
+| `PATCH`  | `/tasks/:id`          | Update an eligible pending task                |
+| `DELETE` | `/tasks/:id`          | Soft-delete an eligible task                   |
+| `POST`   | `/tasks/:id/retry`    | Retry an eligible failed task                  |
+| `GET`    | `/tasks/:id/history`  | Read append-only task history                  |
+| `GET`    | `/files/:id/download` | Stream an authorized private attachment        |
 
 ### Admin and operations
 
-| Method | Path                       | Purpose                         |
-| ------ | -------------------------- | ------------------------------- |
-| `GET`  | `/admin/dashboard/summary` | System aggregates/queue summary |
-| `GET`  | `/admin/tasks`             | Global task list                |
-| `GET`  | `/health/live`             | Process liveness                |
-| `GET`  | `/health/ready`            | PostgreSQL/Redis readiness      |
-| `GET`  | `/docs`, `/openapi.json`   | Protected/development API docs  |
+| Method | Path                       | Purpose                              |
+| ------ | -------------------------- | ------------------------------------ |
+| `GET`  | `/admin/dashboard/summary` | Global task totals and queue context |
+| `GET`  | `/admin/tasks`             | Read-only global task list           |
+| `GET`  | `/health/live`             | Process liveness                     |
+| `GET`  | `/health/ready`            | PostgreSQL and Redis readiness       |
+| `GET`  | `/openapi.json`            | OpenAPI 3.1 description              |
 
-Initial admin scope is read-only; admin mutations require new audit/product rules.
+## Authentication and mutation safety
 
-### Operational health
+Access and rotating refresh credentials are HttpOnly cookies. Browser mutations also require an allowed origin and a CSRF header matching the browser-readable CSRF cookie. Credentialed CORS accepts only configured origins.
 
-- `/health/live` returns `200` when the API process can serve HTTP; it does not imply dependency readiness.
-- `/health/ready` returns `200` only after bounded PostgreSQL and Redis checks succeed.
-- A failed or timed-out required dependency check returns `503` with the stable code `SERVICE_NOT_READY`.
+The client may perform one single-flight refresh and one replay after an access `401`. A `403` or lifecycle/version `409` must not trigger token refresh. See [security.md](security.md) for the full security model.
 
-## Authentication transport
+## Task creation and listing
 
-- Short-lived access JWT and rotating refresh credential use `Secure`, `HttpOnly`, `SameSite=Lax` cookies in production.
-- A browser-readable CSRF cookie must match a mutation header; credentialed CORS uses exact configured origins.
-- The frontend performs at most one single-flight refresh and one request replay after an access `401`.
-- `403` and lifecycle `409` never trigger refresh.
+Task input includes `title`, optional `description`, `type`, versioned `input`, optional future `scheduledAt`, and bounded `maxAttempts`. Multipart requests send the same schema as JSON in a `task` field plus `attachments`.
 
-Security details are authoritative in [security.md](security.md).
+Creation returns `202 Accepted` with a durable pending task because execution is asynchronous. A temporary dispatch failure remains recoverable through reconciliation.
 
-## Task creation
+`GET /tasks` supports:
 
-Core fields are `title`, optional `description`, `type`, versioned `input`, optional future `scheduledAt`, and bounded `maxAttempts`.
+- `q`, `status`, `type`, and `scheduled` filters;
+- `createdFrom` and `createdTo` UTC bounds;
+- `sortBy` of `createdAt`, `updatedAt`, `scheduledAt`, `status`, or `title`;
+- `sortOrder` of `asc` or `desc`;
+- positive `page` and `pageSize`, with page size capped at 50.
 
-JSON-only creation sends the schema directly. Multipart creation sends:
+Unknown query fields are rejected. Sorting uses an ID tie-breaker, and metadata reports page, page size, total items, and total pages.
 
-- `task`: JSON matching the same schema;
-- `attachments`: bounded verified image/PDF files.
+## Concurrency and status updates
 
-The API returns the durable pending task with `202` because execution is separate. Temporary Redis dispatch failure remains recoverable through reconciliation.
+Task resources expose integer `version`. It advances whenever the durable user-visible snapshot changes, including worker transitions. Task detail returns an `ETag`; update, delete, and retry require the matching value in `If-Match`. A stale precondition returns `409 TASK_VERSION_CONFLICT` without bypassing lifecycle rules in [requirements.md](requirements.md).
 
-`GET /tasks/:id` returns the owned task plus safe attachment metadata (`id`, display name,
-detected MIME type, byte size, and optional SHA-256). It never returns the private storage key;
-bytes remain available only through the separately authorized download route.
-
-## Listing
-
-| Parameter                     | Rule                                                       |
-| ----------------------------- | ---------------------------------------------------------- |
-| `q`                           | Bounded title/description search                           |
-| `status`, `type`, `scheduled` | Allowlisted filters                                        |
-| `createdFrom`, `createdTo`    | Valid UTC range                                            |
-| `sortBy`                      | `createdAt`, `updatedAt`, `scheduledAt`, `status`, `title` |
-| `sortOrder`                   | `asc` or `desc`                                            |
-| `page`, `pageSize`            | Positive; defaults 1/20; max page size 50                  |
-
-Unknown fields are rejected and all sorts add an ID tie-breaker. Metadata returns page, page size, total items, and total pages.
+The authenticated `task.status.changed` Socket.IO event contains only `taskId`, `status`, `executionVersion`, and `occurredAt`. It is an invalidation hint: clients refetch task, history, list, and dashboard data. Reconnect and bounded polling for selected active tasks handle missed events.
 
 ## Dashboard queue context
 
-Dashboard summaries return durable task counts plus `queue`, containing `waiting`, `delayed`,
-and `active` BullMQ job counts. A user summary resolves only the caller's current job IDs, with a
-maximum of 50 job IDs and batches of 10 Redis reads; the admin summary reports the global queue.
-`available: false` means an exact queue context could not be returned, either because Redis/BullMQ
-could not be read or because the caller exceeded the scoped limit. PostgreSQL-backed task counts
-remain available in both cases.
+Dashboard responses contain PostgreSQL-backed task counts and a `queue` object with `waiting`, `delayed`, and `active`. User views resolve only the caller's current job IDs; admin views use global queue counts. `queue.available: false` means Redis/BullMQ could not be read, while durable counts remain usable.
 
-## Concurrency and lifecycle
+## Common statuses
 
-Task resources expose integer `version`. It advances whenever the durable task snapshot changes.
-The task-detail `ETag` incorporates that version and the snapshot's last-modified timestamp, so a
-cached detail response is revalidated after worker transitions, including records created before
-the current versioning policy. Update, delete, and retry accept either the current numeric version
-or the task-detail `ETag` in `If-Match`; stale preconditions return `409 TASK_VERSION_CONFLICT`.
-Matching versions do not bypass lifecycle rules in
-[requirements.md](requirements.md).
-
-Representative codes include `TASK_NOT_FOUND`, `TASK_INVALID_TRANSITION`, `TASK_RETRY_NOT_ALLOWED`, `TASK_VERSION_CONFLICT`, `VALIDATION_FAILED`, `CSRF_INVALID`, `FORBIDDEN`, `RATE_LIMITED`, and `SERVICE_UNAVAILABLE`.
-
-## Live status
-
-Authenticated Socket.IO event `task.status.changed` contains only `taskId`, `status`, `executionVersion`, and `occurredAt`. It is an invalidation hint, not durable state. The client refetches affected task/history/list/dashboard queries, including after reconnect. Selected pending or processing task detail/history also refetch at a bounded interval, so a completion that occurs before a detail subscription is established still converges on canonical state.
+|        Status | Meaning                                    |
+| ------------: | ------------------------------------------ |
+|         `200` | Successful read, login, refresh, or update |
+|         `201` | Registration created a user/session        |
+|         `202` | Asynchronous task or retry accepted        |
+|         `204` | Logout or delete completed                 |
+| `400` / `422` | Malformed transport or invalid fields      |
+| `401` / `403` | Authentication or authorization failure    |
+|         `404` | Missing or concealed out-of-scope resource |
+|         `409` | Duplicate, lifecycle, or version conflict  |
+| `413` / `429` | Payload too large or rate limited          |
+|         `503` | Required infrastructure unavailable        |
