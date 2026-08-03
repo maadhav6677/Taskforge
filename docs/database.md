@@ -1,6 +1,10 @@
 # Database design
 
-**Status:** Persistence baseline and task lifecycle repositories implemented
+**Status:** Current persistence model and lifecycle invariants
+
+## Purpose and ownership
+
+This document defines durable data ownership, schema invariants, indexes, transaction boundaries, migration policy, seed behavior, and infrastructure-backed verification. Update it with every schema, constraint, index, migration, seed, or transaction-boundary change.
 
 PostgreSQL is authoritative for identity, task state/history, results, and attachment metadata. Redis/BullMQ state never becomes the only explanation for user-visible behavior.
 
@@ -107,7 +111,7 @@ Searchable lifecycle data remains in columns; JSONB is limited to type-specific 
 - Original name is display-only; opaque unique storage key is the path identity.
 - Server-detected MIME, positive bounded size, and nullable inspection checksum.
 - The initial database bound is 8 MiB and SHA-256 values must be lowercase 64-character hex.
-  The cross-row maximum attachment count remains a Phase 6 service transaction rule because a
+  The cross-row maximum attachment count remains a service transaction rule because a
   row `CHECK` constraint cannot safely count sibling records.
 
 ## Constraints and indexes
@@ -155,11 +159,11 @@ Reconciliation reads bounded batches of current pending undispatched rows, adds 
 - Custom extensions/constraints/indexes are migrations, never undocumented manual steps.
 - `db push` is not the deployment path.
 - Run production/Compose migrations explicitly once before traffic.
-- Future destructive changes require an expand/migrate/contract plan.
+- Destructive changes require an expand/migrate/contract plan.
 
 Seed data is deterministic/idempotent and includes one development user, one admin, and representative pending/scheduled/completed/failed tasks with consistent history. Production does not seed automatically.
 
-The committed Phase 2 history is deliberately split:
+The committed initial migration history is deliberately split:
 
 1. `20260802130000_initial_schema` creates enums, tables, foreign keys, named constraints,
    query-driven indexes, and the append-only history trigger.
@@ -170,7 +174,7 @@ fixed UUIDs and timestamps, upserts the two users and four task snapshots, and i
 history events without mutating existing history. Running it repeatedly preserves the verified
 2-user, 4-task, 15-event result.
 
-## Required integration tests
+## Integration verification
 
 Use real PostgreSQL for migration-from-empty, seed consistency, email uniqueness, ownership, list/search ordering, append-only history, soft deletion, optimistic conflicts, and conditional claim/finalization.
 

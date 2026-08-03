@@ -1,6 +1,12 @@
 # Architecture
 
-**Status:** Accepted baseline
+**Status:** Current runtime architecture
+
+## Purpose and ownership
+
+This document defines TaskForge runtime boundaries, responsibility ownership, source-of-truth rules, and cross-process data flow. Update it when a runtime, module boundary, state owner, queue flow, cache policy, or deployment topology changes.
+
+Detailed implementation belongs in [system-design.md](system-design.md); decision rationale belongs in [decisions.md](decisions.md).
 
 ## Style
 
@@ -155,12 +161,12 @@ Initial private local storage is shared only by API and worker containers. The A
 
 ## Runtime topology
 
-Compose will run `web`, `api`, `worker`, `postgres`, and `redis`, plus named data/upload volumes. PostgreSQL 18 uses its version-aware `/var/lib/postgresql` volume layout and gates API/worker startup on `pg_isready`. The API and worker share one multi-target Docker build, generate the pinned Prisma client during the build, and close their database pool during graceful shutdown; the web runtime uses Next.js standalone output. Images use pinned deterministic installs, production-only runtime dependencies, non-root users, and health checks. Migrations run explicitly once rather than from every replica.
+Compose runs `web`, `api`, `worker`, `postgres`, and `redis`, plus named data/upload volumes. PostgreSQL 18 uses its version-aware `/var/lib/postgresql` volume layout and gates API/worker startup on `pg_isready`. The API and worker share one multi-target Docker build, generate the pinned Prisma client during the build, and close their database pool during graceful shutdown; the web runtime uses Next.js standalone output. Images use pinned deterministic installs, production-only runtime dependencies, non-root users, and health checks. Migrations run explicitly once rather than from every replica.
 
 Operational requirements:
 
 - `/health/live` for process liveness.
-- `/health/ready` returns `200` only after bounded PostgreSQL/Redis checks succeed; unavailable or not-yet-integrated checks return `503`.
+- `/health/ready` returns `200` only after bounded PostgreSQL/Redis checks succeed; failed or timed-out checks return `503`.
 - Pino logs with request/task/job/execution identifiers and redaction.
 - Graceful HTTP, worker, Prisma, and Redis shutdown.
 

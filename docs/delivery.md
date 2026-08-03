@@ -1,141 +1,144 @@
-# Delivery plan
+# Engineering delivery and release readiness
 
-**Status:** End-to-end prototype implemented; final production/submission gates remain active
+**Status:** Core local product implemented; release hardening remains active
 
-## Strategy
+## Purpose and ownership
 
-Build one verified vertical capability at a time and keep milestone commits runnable. Prove backend/domain behavior before frontend polish depends on it. Start bonus work only after mandatory behavior is secure, tested, documented, and reproducible.
+This document tracks implemented capabilities, engineering priorities, verification gates, operational risks, and remaining release work. Update it when a capability reaches a new state, a release risk changes, or new verification evidence becomes available.
 
-## Priorities
+Product rules remain in [requirements.md](requirements.md). Technical boundaries remain in [architecture.md](architecture.md) and [decisions.md](decisions.md).
 
-- **P0:** mandatory stack, auth, task lifecycle, worker, Redis uses, database/UI quality, Docker, required artifacts/video.
-- **P1:** idempotency/reconciliation, meaningful tests, upload safety, accessibility, logs, graceful shutdown, CI.
-- **P2:** Socket.IO polish, small E2E suite, optional deployment.
+## Delivery strategy
 
-Deployment is the first item dropped if reliability is uncertain.
+Build and verify one vertical capability at a time while keeping the repository runnable. Prove domain and backend behavior before dependent UI polish, and complete correctness/security work before optional platform expansion.
 
-## Phases
+Priorities:
 
-| Phase | Outcome                                                                          | Gate                                                               |
-| ----: | -------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-|     0 | Requirements, architecture, decisions, contracts                                 | Complete                                                           |
-|     1 | pnpm workspace; Next/Express API+worker; TS/lint/test/config/log/health baseline | Root install/check/test/build works; runtimes start separately     |
-|     2 | Prisma/PostgreSQL schema, constraints, indexes, migrations, seed                 | Complete                                                           |
-|     3 | Argon2id auth, access JWT, Redis refresh rotation, CSRF/CORS/RBAC                | Rotation/revocation/negative authorization tests pass              |
-|     4 | Task state policy, CRUD/history/list/admin REST and OpenAPI                      | Lifecycle, ownership, pagination, status/error contract tests pass |
-|     5 | BullMQ worker, scheduling, retries, idempotency, reconciliation                  | Async/delay/retry/duplicate/outage integration tests pass          |
-|     6 | Private uploads and file-inspection executor                                     | Type/size/path/ownership/cleanup tests pass                        |
-|     7 | Frontend auth shell and dashboard                                                | Session, responsive, keyboard, loading/error states verified       |
-|     8 | Task list/create/detail/edit/delete/retry/history UI                             | URL state, conflicts, all lifecycle UI states verified             |
-|     9 | Bounded caches and authenticated Socket.IO hints                                 | Scope/invalidation/outage/reconnect tests pass                     |
-|    10 | Full hardening, Docker, CI, OpenAPI/Postman, README, video                       | Clean-room setup and public submission checklist pass              |
+- **P0 — Product correctness:** authentication, authorization, task lifecycle, queue/worker behavior, durable history, private files, and reproducible local startup.
+- **P1 — Engineering confidence:** duplicate safety, reconciliation, negative-path tests, accessibility, structured logs, graceful shutdown, CI, and clean containers.
+- **P2 — Platform maturity:** browser E2E smoke coverage, production observability, object storage, managed infrastructure, and public deployment.
 
-Update phase status here only when its gate passes. File creation alone is not completion.
+## Capability status
 
-The current working tree implements the prototype scope across Phases 0–10. Local verification proves
-the root quality gate, 20 unit/component/contract tests, 17 real PostgreSQL/Redis/BullMQ integration
-tests, fresh migration and deterministic seed behavior, production image builds, and a healthy Compose
-runtime for web, API, worker, PostgreSQL, and Redis. The remaining table gates are retained as release
-criteria: do not describe manual accessibility, browser E2E, outage matrices, public CI execution,
-video, or deployment as complete until their evidence exists.
+| Capability                          | State       | Readiness evidence                                                            |
+| ----------------------------------- | ----------- | ----------------------------------------------------------------------------- |
+| pnpm workspace and shared contracts | Implemented | Root install, generation, lint, typecheck, test, and build scripts            |
+| PostgreSQL schema and migrations    | Implemented | Committed migrations, constraints, indexes, deterministic seed                |
+| Authentication and sessions         | Implemented | Argon2id, access JWT, Redis refresh rotation, CSRF/CORS/RBAC tests            |
+| Task REST lifecycle                 | Implemented | CRUD, list controls, history, optimistic conflicts, admin reads, OpenAPI      |
+| Asynchronous processing             | Implemented | BullMQ worker, scheduling, retries, deterministic delivery, reconciliation    |
+| Private file inspection             | Implemented | Magic-byte validation, private storage, authorized download, SHA-256 result   |
+| User and admin web applications     | Implemented | Auth, dashboard, task workflows, history, admin read views                    |
+| Cache and live invalidation         | Implemented | Bounded cache, invalidation, authenticated Socket.IO hints, canonical refetch |
+| Reproducible local runtime          | Implemented | `.env.example`, Dockerfiles, Compose, migrations, seed, health endpoints      |
+| API developer tooling               | Implemented | Swagger/OpenAPI and secret-free Postman smoke collection                      |
+| CI quality gates                    | Implemented | Workspace checks, integration tests, and container builds in GitHub Actions   |
+| Browser E2E suite                   | Planned     | Small critical-flow Playwright suite still needed                             |
+| Managed production deployment       | Planned     | Requires persistent services, object storage, secrets, TLS, and monitoring    |
 
-## Milestone details
+State meanings:
 
-### Foundation (Phases 1–2)
+- **Implemented:** code and automated verification exist in the repository.
+- **In progress:** implementation exists but a named readiness gate is incomplete.
+- **Planned:** intentionally outside the current runnable product.
 
-- Pin Node/pnpm/dependencies and commit lockfile.
-- Establish strict quality scripts shared with CI.
-- Create separate API/worker composition roots and shared wire contracts.
-- Implement the schema described in [database.md](database.md), including deterministic development user/admin and representative task history.
+## Development workflow
 
-Suggested commits:
+For each change:
 
-- `chore: scaffold typed web and api workspaces`
-- `feat(db): add task lifecycle schema and seed data`
+1. Identify the owning product rule and technical document.
+2. Implement the smallest vertical behavior that preserves existing invariants.
+3. Add positive, negative, authorization, concurrency, and recovery tests in proportion to risk.
+4. Run focused checks for fast feedback.
+5. Run the widest relevant integration/build/container checks.
+6. Update the owning documentation and generated API contract.
+7. Inspect the exact diff and keep the commit focused.
 
-### Backend core (Phases 3–6)
+## Verification levels
 
-- Implement [security](security.md), then task REST contracts, then asynchronous execution and files.
-- Keep queue behind the task use-case boundary; never execute inline.
-- Verify real PostgreSQL/Redis behavior before building dependent screens.
+### Fast feedback
 
-Suggested commits:
+1. Format and lint the changed workspace.
+2. Run strict type checking.
+3. Run focused unit, component, or HTTP tests.
+4. Build the changed runtime when compilation or bundling may differ from tests.
 
-- `feat(auth): add rotating sessions and role-based access`
-- `feat(tasks): add authorized lifecycle APIs and history`
-- `feat(queue): process and reconcile scheduled tasks`
-- `feat(files): add secure attachments and inspection jobs`
+### Infrastructure confidence
 
-### Frontend (Phases 7–8)
+Run `pnpm test:integration:postgres` for changes involving PostgreSQL, Redis sessions, BullMQ behavior, scheduling, retries, duplicate delivery, reconciliation, or cross-process state.
 
-- Establish state ownership before feature screens.
-- Build task workflows against stable contracts.
-- Treat responsive/accessibility/edge states as acceptance, not final polish.
+The runner requires an allowlisted `_test` database, applies committed migrations from empty, isolates Redis database 15, uses bounded polling, and cleans up the test database.
 
-Suggested commits:
+### Repository quality gate
 
-- `feat(web): add accessible auth shell and dashboard`
-- `feat(web): add responsive task lifecycle workflows`
+Run `pnpm ci:check` before merging cross-workspace or release-facing changes. It covers Prisma generation, lint, formatting, strict type checking, default tests, and production builds.
 
-### Optimization/submission (Phases 9–10)
+Run `pnpm docker:check` when Dockerfiles, Compose, environment contracts, runtime entry points, or production dependencies change.
 
-- Add cache/live status as recoverable optimizations.
-- Run full threat, accessibility, clean Compose, and fresh-database checks.
-- Generate/verify required documentation artifacts and record video last.
+### Release smoke
 
-Suggested commits:
+Before a tagged or deployed release:
 
-- `feat(realtime): cache and stream task status`
-- `test: cover auth task and worker critical paths`
-- `chore(docker): add reproducible production containers`
-- `ci: verify quality gates and container builds`
-- `docs: finalize evaluation and API guide`
-
-## Verification order
-
-After canonical scripts exist:
-
-1. Format/lint changed workspace.
-2. Strict typecheck.
-3. Focused unit tests.
-4. Relevant real PostgreSQL/Redis integration tests.
-5. Changed runtime's production build.
-6. Complete non-E2E suite before milestone commit.
-7. Full CI-equivalent, clean Compose, and E2E smoke before submission.
-
-Use fake clocks for pure time logic and bounded polling for workers; never fixed multi-second synchronization sleeps.
+- start from a clean clone and fresh named volumes;
+- apply migrations and deterministic seed data;
+- start web, API, worker, PostgreSQL, and Redis;
+- verify liveness and readiness endpoints;
+- exercise login, create, scheduled execution, completion/failure, history, retry, and authorized file download;
+- verify graceful shutdown and restart recovery;
+- confirm no secrets, debug output, generated uploads, or local paths are tracked.
 
 ## Primary risks
 
-| Risk                            | Control                                                                  |
-| ------------------------------- | ------------------------------------------------------------------------ |
-| Cookie/CORS deployment mismatch | Real browser-origin integration during auth phase                        |
-| Database/queue drift            | Deterministic IDs, execution version, conditional claims, reconciliation |
-| Flaky queue tests               | Injected clocks and bounded condition polling                            |
-| File/database divergence        | Temporary storage plus compensation/cleanup                              |
-| Mixed Redis pressure            | TTLs, bounded retention, noeviction; production split documented         |
-| Duplicate browser state         | Enforce Query/Redux/URL ownership                                        |
-| Bonus scope threatens core      | P0/P1 gates; drop deployment/live polish first                           |
-| Documentation drift             | Owning doc updated in same change                                        |
+| Risk                             | Current control                                                           | Next maturity step                               |
+| -------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------ |
+| Cookie/CORS environment mismatch | Exact origins, CSRF, secure-cookie configuration, browser/API tests       | Deployment-specific browser smoke                |
+| PostgreSQL/queue drift           | Deterministic IDs, execution versions, conditional claims, reconciliation | Metrics and alerting on undispatched work        |
+| Duplicate job delivery           | Conditional claim/finalization plus versioned job identity                | Long-running chaos and restart tests             |
+| File/database divergence         | Bounded validation, compensation cleanup, metadata transaction            | Object storage and lifecycle policies            |
+| Shared Redis pressure            | Namespaces, bounded TTLs, AOF, `noeviction`, separate connections         | Split queue Redis from session/cache Redis       |
+| Missed live events               | Socket hints plus refocus/reconnect/interval refetch                      | Connection metrics and E2E reconnect coverage    |
+| Accessibility regressions        | Semantic components and component-level assertions                        | Automated browser audit and manual keyboard pass |
+| Documentation drift              | Explicit document ownership and same-change updates                       | Link/contract drift checks in CI                 |
 
 ## Definition of done
 
-### Product
+### Product behavior
 
-- Auth/session/RBAC and user isolation work.
-- Immediate/scheduled tasks execute only in worker; lifecycle/history/retries remain truthful.
-- Dashboard, list controls, files, and responsive accessible UI meet [requirements](requirements.md).
+- The requested user workflow succeeds.
+- Invalid lifecycle actions, stale versions, and out-of-scope resources fail with stable public behavior.
+- Immediate and scheduled tasks execute only in the worker.
+- Current snapshot, result/error, and append-only history remain consistent.
+
+### Security and data
+
+- Authentication, CSRF, role, ownership, rate-limit, and upload policies still apply.
+- Sensitive values are absent from responses, logs, fixtures, documentation, and generated artifacts.
+- Database changes use committed migrations, constraints, and matching integration tests.
 
 ### Engineering
 
-- Fresh migration/seed and clean Compose succeed.
-- Duplicate delivery, dispatch failure, security negatives, and infrastructure failure paths have tests.
-- Logs are structured/redacted; API/worker shut down cleanly.
-- Local and public CI quality gates pass.
+- Focused tests and the widest relevant quality gates pass.
+- Failure and recovery behavior is observable and bounded.
+- API and worker shutdown remain graceful.
+- Documentation, OpenAPI, configuration examples, and code agree.
+- The final diff contains only intended files.
 
-### Submission
+## Remaining release work
 
-- Public repository has focused incremental history.
-- README, `.env.example`, Docker, migrations, seed, OpenAPI, and verified Postman collection are accurate.
-- Public 5–10-minute video covers architecture, structure, auth, queue, Redis, database, decisions, live lifecycle, tests, and trade-offs.
-- Live URL is included only if stable and secure.
+- Add a small Playwright suite for login, task creation, live completion, failure/retry, and ownership boundaries.
+- Complete a manual keyboard, focus, responsive-layout, and screen-reader status pass.
+- Exercise PostgreSQL, Redis, worker, storage, cache, and Socket.IO outage/restart scenarios as a documented matrix.
+- Add production object storage, malware scanning, managed secrets, and retention policies before accepting untrusted public uploads.
+- Add metrics, tracing, error reporting, dashboards, alerts, and operational runbooks before a managed production rollout.
+- Select a deployment provider only after the persistence, storage, TLS, cookie, secret, backup, and monitoring requirements are satisfied.
+
+## Release checklist
+
+- [ ] Product requirements and current limits are accurate.
+- [ ] Fresh install, migration, seed, and startup commands work from the README.
+- [ ] `pnpm ci:check` passes.
+- [ ] `pnpm test:integration:postgres` passes against isolated real infrastructure.
+- [ ] `pnpm docker:check` and a clean Compose smoke pass.
+- [ ] OpenAPI, Swagger UI, Postman, `.env.example`, migrations, and seed match current behavior.
+- [ ] Security-sensitive configuration uses environment/secret management rather than committed values.
+- [ ] Known risks and deferred controls are documented without presenting them as complete.

@@ -1,6 +1,10 @@
 # Coding and quality conventions
 
-**Status:** Accepted baseline
+**Status:** Current implementation and quality conventions
+
+## Purpose and ownership
+
+This document defines the conventions used to keep TaskForge readable, testable, secure, and consistent across workspaces. Update it when the team adopts a new implementation, testing, dependency, documentation, or Git policy.
 
 Write the smallest explicit implementation that preserves product invariants. Readability, testability, and failure behavior matter more than pattern count or clever brevity.
 
@@ -74,7 +78,7 @@ Add interfaces only at meaningful seams or with multiple implementations. No aut
 - Use structured Pino logging, not committed `console.log`.
 - Log once at the layer with context; carry request/task/job/execution identifiers and redact per `security.md`.
 - Comments explain invariants, races, and trade-offs—not syntax.
-- Remove commented-out code. TODOs need a concrete issue/reason and cannot remain on mandatory paths.
+- Remove commented-out code. TODOs need a concrete issue or reason and cannot remain on supported critical paths.
 
 ## Tests
 

@@ -2,9 +2,9 @@
 
 **Status:** Active
 
-## Usage
+## Purpose and usage
 
-These are accepted constraints. Before implementing an alternative, add or update a decision with the new context, consequences, and migration effect. Superseded decisions remain visible.
+This log explains the technical choices that shape TaskForge and prevents code, tests, and documentation from drifting into competing architectures. Before implementing an alternative, add or update a decision with the new context, chosen option, consequences, and migration effect. Keep superseded decisions visible with their replacement reference.
 
 ## Accepted decisions
 
@@ -18,7 +18,7 @@ Next.js owns web routing/rendering; Express owns all business APIs. Splitting au
 
 ### D-003 — PostgreSQL and Prisma
 
-Preferred PostgreSQL over MongoDB for ownership, constraints, transactional lifecycle/history, and indexed aggregates. Use Prisma with reviewed migrations and JSONB only for versioned task input/result.
+Use PostgreSQL rather than MongoDB for ownership, constraints, transactional lifecycle/history, and indexed aggregates. Use Prisma with inspected SQL migrations and JSONB only for versioned task input/result.
 
 ### D-004 — BullMQ
 
@@ -38,7 +38,7 @@ Persist task/event, enqueue deterministic job, then record dispatch. Reconcile p
 
 ### D-008 — Local storage adapter first
 
-Use private local storage and a shared API/worker volume for the assessment. Keep a storage interface for later S3-compatible storage, signed downloads, retention, and scanning.
+Use private local storage and a shared API/worker volume for the current local runtime. Keep a storage interface for later S3-compatible storage, signed downloads, retention, and scanning.
 
 ### D-009 — Deterministic job types
 

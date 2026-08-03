@@ -1,8 +1,12 @@
 # TaskForge high-level and low-level design
 
-**Status:** Prototype design implemented; production rollout concerns remain explicit
+**Status:** Current implementation map; production extensions remain explicit
 
-This document is the implementation map for engineers and AI agents. Product rules remain authoritative in [requirements.md](requirements.md), wire contracts in [api.md](api.md), persistence in [database.md](database.md), and security controls in [security.md](security.md).
+## Purpose and ownership
+
+This document maps the current implementation for engineers and coding agents: runtime components, primary flows, module responsibilities, concurrency algorithms, failure behavior, and verification boundaries. Update it when implemented components or algorithms change.
+
+Product rules remain authoritative in [requirements.md](requirements.md), wire contracts in [api.md](api.md), persistence in [database.md](database.md), and security controls in [security.md](security.md).
 
 ## High-level design (HLD)
 
@@ -185,6 +189,6 @@ The API client sends credentials, obtains CSRF before mutations, performs one si
 - BullMQ integration runs a real worker and bounded polling to prove execution and duplicate safety without fixed sleeps.
 - Root CI runs generation, lint, format, strict typecheck, unit tests, production builds, integration tests, and Compose image builds.
 
-## Intentional prototype limits
+## Current platform limits
 
 Object storage, malware scanning, email verification/recovery, MFA, distributed tracing, managed secret rotation, cursor pagination, multi-region queue design, recurring tasks, and public deployment are not represented as complete. The local-file adapter and single Redis deployment have explicit replacement boundaries; product truth remains portable in PostgreSQL.
