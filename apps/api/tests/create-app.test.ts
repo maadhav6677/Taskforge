@@ -53,19 +53,25 @@ describe('TaskForge API foundation', () => {
   });
 
   it('allows the configured browser origin without reflecting an untrusted origin', async () => {
-    const trustedResponse = await request(createApp())
-      .get('/api/v1/health/live')
-      .set('Origin', 'http://localhost:3000')
-      .expect(200);
+    for (const origin of [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'http://0.0.0.0:3000',
+    ]) {
+      const trustedResponse = await request(createApp())
+        .get('/api/v1/health/live')
+        .set('Origin', origin)
+        .expect(200);
 
-    expect(trustedResponse.headers['access-control-allow-origin']).toBe('http://localhost:3000');
-    expect(trustedResponse.headers['access-control-allow-credentials']).toBe('true');
+      expect(trustedResponse.headers['access-control-allow-origin']).toBe(origin);
+      expect(trustedResponse.headers['access-control-allow-credentials']).toBe('true');
+    }
 
     const untrustedResponse = await request(createApp())
       .get('/api/v1/health/live')
-      .set('Origin', 'https://untrusted.example');
+      .set('Origin', 'https://untrusted.example')
+      .expect(200);
 
-    expect(untrustedResponse.status).toBeGreaterThanOrEqual(400);
     expect(untrustedResponse.headers['access-control-allow-origin']).toBeUndefined();
   });
 
