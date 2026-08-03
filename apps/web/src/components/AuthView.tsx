@@ -30,7 +30,8 @@ export function AuthView({ onAuthenticated }: { onAuthenticated: (user: User) =>
   const passwordValue = watch('password');
   const passwordLengthValid = passwordValue.length >= 12 && passwordValue.length <= 128;
   const showPasswordRules =
-    mode === 'register' && (passwordRulesOpen || (formState.submitCount > 0 && !passwordLengthValid));
+    mode === 'register' &&
+    (passwordRulesOpen || (formState.submitCount > 0 && !passwordLengthValid));
   const passwordField = register('password', { required: true, minLength: 12, maxLength: 128 });
   const mutation = useMutation({
     mutationFn: (values: Credentials) =>
