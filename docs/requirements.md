@@ -1,161 +1,72 @@
 # Product requirements
 
-**Status:** Current product baseline
+This document defines what TaskForge supports and the rules users can rely on. See [architecture.md](architecture.md) for runtime design and [api.md](api.md) for the HTTP contract.
 
-## Purpose and ownership
+## Product goal
 
-This document defines TaskForge product behavior, supported actors, lifecycle rules, quality attributes, and non-goals. Update it whenever a user-visible capability, role, task state rule, or supported product boundary changes.
-
-Implementation detail belongs in [architecture.md](architecture.md) and [system-design.md](system-design.md). HTTP detail belongs in [api.md](api.md).
-
-## Product objective
-
-TaskForge is a multi-user task automation platform. Users submit immediate or scheduled work, a separate Redis-backed worker executes it asynchronously, and the product exposes a durable current state plus append-only execution history.
-
-The product is designed around four outcomes:
-
-- HTTP requests accept work quickly without running background operations inline.
-- Users can understand the state, result, and history of every task.
-- Retries, duplicate delivery, and temporary queue failures do not corrupt durable state.
-- Roles, ownership, sessions, and private files remain enforced by the backend.
+TaskForge lets authenticated users create immediate or scheduled tasks, track their progress, inspect results and history, and retry eligible failures. Work runs asynchronously so API requests remain responsive and task state survives process restarts or temporary queue failures.
 
 ## Actors
 
-### User
+- **User:** manages only their own tasks, history, dashboard data, and files.
+- **Admin:** has explicit read-only system-wide task and dashboard views. Public registration cannot create admins.
+- **Worker:** claims eligible tasks and records their outcome; it is not a human-facing actor.
 
-- Register, sign in, refresh a session, and sign out.
-- Access only owned tasks, events, dashboard counts, and files.
-- Create, search, filter, sort, paginate, update, delete, schedule, inspect, and retry eligible tasks.
+## Supported capabilities
 
-### Admin
+### Accounts and access
 
-- Read system-wide task lists and aggregate status through explicit admin routes.
-- Remain read-only until separate mutation and audit rules are designed.
-- Cannot be created through public registration; deterministic seed or controlled configuration creates admin identities.
-
-## Platform constraints
-
-| Concern           | Current choice                                                                                                |
-| ----------------- | ------------------------------------------------------------------------------------------------------------- |
-| Web               | Next.js 16, React 19, strict TypeScript, responsive accessible components                                     |
-| Browser state     | TanStack Query for server state; Redux Toolkit for client-only global state; URL parameters for list controls |
-| API               | Node.js 24 LTS, Express, versioned REST, Zod runtime validation                                               |
-| Data              | PostgreSQL 18, Prisma, committed migrations, deterministic seed                                               |
-| Jobs              | BullMQ on Redis with a separately runnable worker                                                             |
-| Redis             | Queue mechanics, refresh sessions, rate limits, bounded cache, status Pub/Sub                                 |
-| Authentication    | HttpOnly access JWT, rotating refresh session, CSRF, `USER`/`ADMIN` RBAC                                      |
-| Runtime packaging | pnpm workspace, Dockerfiles, Docker Compose, GitHub Actions                                                   |
-
-The reasoning behind these choices and rejected alternatives lives in [decisions.md](decisions.md).
-
-## Functional behavior
-
-### Authentication and authorization
-
-- Registration, login, refresh, logout, and Argon2id password hashing.
-- Short-lived JWT access authentication with revocable rotating refresh sessions.
-- Server-enforced `USER` and `ADMIN` roles plus resource ownership.
-- Cross-owner resource identifiers do not reveal whether another user's resource exists.
-
-### Dashboard
-
-- Total, pending, processing, completed, and failed task counts.
-- Recent task and queue context scoped to the current user or explicit admin view.
-- Cache is an optimization; dashboard results remain available from PostgreSQL when cache is unavailable.
+- Register, sign in, restore/refresh a session, and sign out.
+- Enforce `USER` and `ADMIN` roles plus task ownership on the server.
+- Conceal another user's resource behind the same response used for a missing resource.
 
 ### Tasks
 
-- Create, read, update, soft-delete, one-time schedule, history, and manual retry.
-- Search title and description with allowlisted filters and sorting plus bounded pagination.
-- Public statuses are exactly `PENDING`, `PROCESSING`, `COMPLETED`, and `FAILED`.
-- A future task remains `PENDING`; `scheduledAt` is execution metadata, not a separate status.
+- Create, view, search, filter, sort, paginate, update, soft-delete, schedule, and inspect history.
+- Run `TEXT_PROCESSING` tasks for allowlisted text operations.
+- Run `FILE_INSPECTION` tasks for verified JPEG, PNG, WebP, and PDF attachments.
+- Show `PENDING`, `PROCESSING`, `COMPLETED`, and `FAILED` as the only public statuses.
+- Provide scoped dashboard totals plus available queue context.
 
-### Queue execution
+### Execution and recovery
 
-- The API persists and dispatches; it never executes task work inline.
-- The worker validates the job, conditionally claims the current execution, and records every meaningful transition.
-- Transient failures use bounded automatic retries with exponential backoff.
-- Deterministic job IDs, execution versions, and conditional writes prevent stale or duplicate delivery from executing the current task twice.
-- Reconciliation redispatches durable pending work after a temporary queue failure.
-
-### Files
-
-- Accept verified JPEG, PNG, WebP, and PDF attachments within count and size limits.
-- Verify magic bytes instead of trusting filenames or browser MIME values.
-- Store bytes privately and authorize every download through the owning task.
-- Keep the local storage adapter replaceable by an object-storage implementation.
-
-### Live updates
-
-- Authenticated Socket.IO events contain minimal status-change hints.
-- Events trigger query invalidation and canonical API refetch; they do not replace durable state.
-- Refocus, reconnect, and interval refetch preserve correctness if events are missed.
-
-## Initial task types
-
-- `TEXT_PROCESSING`: deterministic allowlisted text transformation and analysis.
-- `FILE_INSPECTION`: verified type, size, metadata, and SHA-256 inspection for supported images and PDFs.
-
-TaskForge does not execute arbitrary user code, commands, URLs, or templates.
+- Persist a task before dispatching it to BullMQ; HTTP requests never execute task work inline.
+- Retry transient worker failures automatically with bounded exponential backoff.
+- Reject stale or duplicate queue deliveries without repeating the current execution.
+- Redispatch durable pending work after a temporary queue failure.
+- Treat live events as refresh hints and refetch canonical state from the API.
 
 ## Lifecycle rules
 
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING: create or schedule
+    PENDING --> PROCESSING: worker claim
+    PROCESSING --> COMPLETED: success
+    PROCESSING --> PENDING: transient failure
+    PROCESSING --> FAILED: permanent or exhausted failure
+    FAILED --> PENDING: manual retry
+```
+
+- A future task remains `PENDING`; `scheduledAt` records when it becomes eligible.
 - Only `PENDING` tasks may change input, attachments, or schedule.
-- Updating or deleting `PROCESSING` tasks returns `409 Conflict` because cancellation is not guaranteed.
-- Deleting a pending task removes its queued job where possible and soft-deletes the durable record.
-- Completed and failed tasks may be soft-deleted while history remains auditable.
-- Automatic attempts stay within one execution version.
-- Manual retry is allowed only from `FAILED`, increments the execution version, clears execution fields, and records an event.
-- Browser-facing update, delete, and retry operations require the current row version through `If-Match`.
-- History is append-only and explains the current state without exposing stacks, paths, credentials, or dependency internals.
+- A `PROCESSING` task cannot be updated or deleted because cancellation is not guaranteed.
+- Manual retry is allowed only from `FAILED` and starts a new execution version.
+- Update, delete, and retry require the latest task version through `If-Match`.
+- Every meaningful transition updates the durable snapshot and append-only history together.
+- Task results and public errors must be safe to display; internal stacks and paths are never exposed.
 
-## Sources of truth
+## Product invariants
 
-- PostgreSQL owns user-visible identity, task state, results, attachment metadata, and history.
-- BullMQ owns waiting, delayed, active, attempt, and lock mechanics.
-- Redis session state controls refresh validity; cache and Pub/Sub remain ephemeral.
-- File storage owns private bytes; PostgreSQL owns their authorized metadata relationship.
-
-## Quality attributes
-
-### Correctness and reliability
-
-- Snapshot and history transitions commit atomically.
-- Queue delivery is treated as at-least-once.
-- Infrastructure failures produce bounded, observable recovery behavior.
-- API and worker processes shut down gracefully.
-
-### Security and privacy
-
-- Runtime validation applies at every external boundary.
-- Backend authorization scopes all protected reads and mutations.
-- Cookies, tokens, passwords, connection URLs, raw files, and internal stacks never appear in public output or logs.
-- Uploaded files remain outside public web roots.
-
-### Developer experience
-
-- A fresh clone can run through documented Node/pnpm and Docker commands.
-- Root scripts cover formatting, linting, strict type checking, tests, builds, integration checks, and container validation.
-- OpenAPI, Swagger UI, `.env.example`, migrations, deterministic seed data, and a secret-free Postman collection stay synchronized with behavior.
-- Architectural and behavioral changes update their owning documentation in the same change.
-
-### User experience
-
-- The web application is responsive and keyboard-usable.
-- Remote workflows expose loading, empty, no-results, error, conflict, unauthorized, and success states.
-- Status meaning is not communicated through color alone.
-
-## Current delivery boundaries
-
-Implemented product scope includes Next.js, PostgreSQL, the Express API, BullMQ worker, Redis sessions/cache/rate limits/Pub/Sub, private local file storage, Jest/Supertest/React Testing Library suites, Docker Compose, and CI configuration.
-
-Public deployment is optional and should be added only with reliable persistent PostgreSQL, Redis, private object storage, secure cookies, secret management, and operational monitoring.
+- PostgreSQL is the source of truth for users, task state, results, attachment metadata, and history.
+- Redis owns queue mechanics, refresh sessions, rate limits, caches, and Pub/Sub hints—not durable product state.
+- Backend policies and owner-scoped database predicates enforce access; frontend guards are presentation only.
+- Uploaded bytes remain private and every download is authorized through the owning task.
+- Queue delivery is at-least-once, so execution must remain idempotent at the task boundary.
+- Search, filters, sorting, and pagination are shareable through URL parameters.
 
 ## Non-goals
 
-- Business microservices, Kubernetes, CQRS, event sourcing, or a workflow definition language.
-- Arbitrary user code, recurring schedules, task dependencies, priorities, or an integration marketplace.
-- Organizations, billing, social login, MFA, password recovery, or email verification.
-- A large design system, production malware-analysis infrastructure, or a full telemetry platform.
+The current product does not provide arbitrary code or URL execution, recurring schedules, task dependencies, priorities, cancellation, organizations, billing, social login, MFA, password recovery, public file hosting, microservices, or Kubernetes.
 
-These boundaries keep the current product focused. Moving an item into active scope requires corresponding requirements, architecture, security, tests, and delivery updates.
+These are deliberate scope limits, not hidden implemented features. Moving one into scope requires matching behavior, security, persistence, API, tests, and documentation.
