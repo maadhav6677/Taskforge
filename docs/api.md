@@ -141,17 +141,20 @@ Unknown fields are rejected and all sorts add an ID tie-breaker. Metadata return
 ## Dashboard queue context
 
 Dashboard summaries return durable task counts plus `queue`, containing `waiting`, `delayed`,
-and `active` BullMQ job counts. A user summary resolves only the caller's current job IDs; the
-admin summary reports the global queue. `available: false` means Redis/BullMQ could not be read,
-while PostgreSQL-backed task counts remain available.
+and `active` BullMQ job counts. A user summary resolves only the caller's current job IDs, with a
+maximum of 50 job IDs and batches of 10 Redis reads; the admin summary reports the global queue.
+`available: false` means an exact queue context could not be returned, either because Redis/BullMQ
+could not be read or because the caller exceeded the scoped limit. PostgreSQL-backed task counts
+remain available in both cases.
 
 ## Concurrency and lifecycle
 
 Task resources expose integer `version`. It advances whenever the durable task snapshot changes.
 The task-detail `ETag` incorporates that version and the snapshot's last-modified timestamp, so a
 cached detail response is revalidated after worker transitions, including records created before
-the current versioning policy. Update, delete, and retry require `If-Match`; mismatch returns
-`409 TASK_VERSION_CONFLICT`. Matching versions do not bypass lifecycle rules in
+the current versioning policy. Update, delete, and retry accept either the current numeric version
+or the task-detail `ETag` in `If-Match`; stale preconditions return `409 TASK_VERSION_CONFLICT`.
+Matching versions do not bypass lifecycle rules in
 [requirements.md](requirements.md).
 
 Representative codes include `TASK_NOT_FOUND`, `TASK_INVALID_TRANSITION`, `TASK_RETRY_NOT_ALLOWED`, `TASK_VERSION_CONFLICT`, `VALIDATION_FAILED`, `CSRF_INVALID`, `FORBIDDEN`, `RATE_LIMITED`, and `SERVICE_UNAVAILABLE`.

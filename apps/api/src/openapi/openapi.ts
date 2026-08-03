@@ -73,8 +73,17 @@ export const openApiDocument = {
     '/dashboard/summary': {
       get: {
         tags: ['Dashboard'],
-        summary: 'Read owned task counts',
-        responses: { '200': { description: 'Summary' } },
+        summary: 'Read owned task counts and bounded queue context',
+        responses: {
+          '200': {
+            description: 'Summary',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/DashboardSummaryEnvelope' },
+              },
+            },
+          },
+        },
       },
     },
     '/tasks': {
@@ -207,9 +216,16 @@ export const openApiDocument = {
     '/admin/dashboard/summary': {
       get: {
         tags: ['Admin'],
-        summary: 'Read system task counts',
+        summary: 'Read system task counts and global queue context',
         responses: {
-          '200': { description: 'Summary' },
+          '200': {
+            description: 'Summary',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/DashboardSummaryEnvelope' },
+              },
+            },
+          },
           '403': { $ref: '#/components/responses/Error' },
         },
       },
@@ -254,7 +270,12 @@ export const openApiDocument = {
         name: 'If-Match',
         in: 'header',
         required: true,
-        schema: { type: 'integer', minimum: 1 },
+        description: 'Current task version or the ETag returned by GET /tasks/{id}.',
+        schema: {
+          type: 'string',
+          pattern: '^(?:W/)?"?[1-9]\\d*(?:-\\d+)?"?$',
+          examples: ['3', '"3-1722686400000"'],
+        },
       },
     },
     requestBodies: {
@@ -284,6 +305,46 @@ export const openApiDocument = {
     schemas: {
       TaskStatus: { type: 'string', enum: ['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED'] },
       TaskType: { type: 'string', enum: ['TEXT_PROCESSING', 'FILE_INSPECTION'] },
+      TaskStatusCounts: {
+        type: 'object',
+        required: ['total', 'pending', 'processing', 'completed', 'failed'],
+        properties: {
+          total: { type: 'integer', minimum: 0 },
+          pending: { type: 'integer', minimum: 0 },
+          processing: { type: 'integer', minimum: 0 },
+          completed: { type: 'integer', minimum: 0 },
+          failed: { type: 'integer', minimum: 0 },
+        },
+      },
+      QueueContext: {
+        type: 'object',
+        required: ['waiting', 'delayed', 'active', 'available'],
+        properties: {
+          waiting: { type: 'integer', minimum: 0 },
+          delayed: { type: 'integer', minimum: 0 },
+          active: { type: 'integer', minimum: 0 },
+          available: {
+            type: 'boolean',
+            description:
+              'False when the queue cannot be read exactly, including an unavailable queue or a scoped context above its configured limit.',
+          },
+        },
+      },
+      DashboardSummaryEnvelope: {
+        type: 'object',
+        required: ['data', 'requestId'],
+        properties: {
+          data: {
+            type: 'object',
+            required: ['counts', 'queue'],
+            properties: {
+              counts: { $ref: '#/components/schemas/TaskStatusCounts' },
+              queue: { $ref: '#/components/schemas/QueueContext' },
+            },
+          },
+          requestId: { type: 'string', format: 'uuid' },
+        },
+      },
       CreateTextTask: {
         type: 'object',
         additionalProperties: false,

@@ -151,7 +151,7 @@ The product transition policy is authoritative in [requirements.md](requirements
 
 ## Concurrency and dispatch
 
-Browser mutations use returned task `version` through `If-Match`; repository writes include the expected `row_version`. The task-detail `ETag` incorporates this version and the snapshot's last-modified timestamp, so every durable snapshot change invalidates a browser-cached detail, including existing rows that predate the versioning policy. Workers use `execution_version` to reject stale jobs.
+Browser mutations use the returned task `version` or task-detail `ETag` through `If-Match`; repository writes include the expected `row_version`. The task-detail `ETag` incorporates this version and the snapshot's last-modified timestamp, so every durable snapshot change invalidates a browser-cached detail, including existing rows that predate the versioning policy. Workers use `execution_version` to reject stale jobs.
 
 Reconciliation reads bounded batches of current pending undispatched rows, adds deterministic jobs with remaining delay, and conditionally records dispatch. BullMQ job uniqueness and worker claim are separate duplicate guards. See [architecture.md](architecture.md).
 

@@ -90,6 +90,11 @@ export interface TaskQueueJob {
   queueJobId: string;
 }
 
+export interface TaskQueueJobList {
+  jobs: TaskQueueJob[];
+  hasMore: boolean;
+}
+
 const toTaskRecord = (task: Task): TaskRecord => ({
   id: task.id,
   ownerId: task.ownerId,
@@ -239,18 +244,23 @@ export class TaskRepository {
     };
   }
 
-  public async listQueueJobs(ownerId?: string): Promise<TaskQueueJob[]> {
+  public async listQueueJobs(ownerId: string, limit: number): Promise<TaskQueueJobList> {
     const tasks = await this.database.task.findMany({
       where: {
         deletedAt: null,
         queueJobId: { not: null },
         status: { in: ['PENDING', 'PROCESSING'] },
-        ...(ownerId ? { ownerId } : {}),
+        ownerId,
       },
       select: { queueJobId: true },
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      take: limit + 1,
     });
 
-    return tasks.flatMap(({ queueJobId }) => (queueJobId ? [{ queueJobId }] : []));
+    return {
+      jobs: tasks.slice(0, limit).flatMap(({ queueJobId }) => (queueJobId ? [{ queueJobId }] : [])),
+      hasMore: tasks.length > limit,
+    };
   }
 
   public async listAll(offset: number, limit: number): Promise<TaskRecord[]> {

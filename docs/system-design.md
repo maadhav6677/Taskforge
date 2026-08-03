@@ -165,7 +165,7 @@ Controllers/routes translate HTTP only: Zod input, service call, status/header/e
 | Client global state | Redux Toolkit         | create panel and selected task            |
 | Local form state    | React Hook Form       | credentials and task draft                |
 
-The API client sends credentials, obtains CSRF before mutations, performs one single-flight refresh and one replay after an access `401`, and never stores tokens. Socket events invalidate queries; selected active task detail/history poll at a bounded interval, and list/dashboard interval/refocus fetches preserve correctness when realtime is absent. Dashboard queue context reads BullMQ job state for only the caller's active job IDs; admin queue context is global.
+The API client sends credentials, obtains CSRF before mutations, performs one single-flight refresh and one replay after an access `401`, and never stores tokens. Socket events invalidate queries; selected active task detail/history poll at a bounded interval, and list/dashboard interval/refocus fetches preserve correctness when realtime is absent. Dashboard queue context reads at most 50 of the caller's active job IDs in batches of 10; it reports unavailable rather than returning partial counts above that limit. Admin queue context is global.
 
 ### Failure mapping
 

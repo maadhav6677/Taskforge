@@ -18,6 +18,9 @@ export interface TaskQueueContext {
   available: boolean;
 }
 
+export const scopedTaskQueueContextJobLimit = 50;
+const scopedTaskQueueContextConcurrency = 10;
+
 export const getBullConnection = () => {
   const url = new URL(env.REDIS_URL);
   const database = url.pathname.length > 1 ? Number(url.pathname.slice(1)) : 0;
@@ -69,18 +72,19 @@ export const getTaskQueueContext = async (
       };
     }
 
-    const states = await Promise.all(jobIds.map((jobId) => queue.getJobState(jobId)));
-    return states.reduce<TaskQueueContext>(
-      (context, state) => {
+    const context: TaskQueueContext = { waiting: 0, delayed: 0, active: 0, available: true };
+    for (let index = 0; index < jobIds.length; index += scopedTaskQueueContextConcurrency) {
+      const batch = jobIds.slice(index, index + scopedTaskQueueContextConcurrency);
+      const states = await Promise.all(batch.map((jobId) => queue.getJobState(jobId)));
+      for (const state of states) {
         if (state === 'delayed') context.delayed += 1;
         if (state === 'active') context.active += 1;
         if (state === 'waiting' || state === 'waiting-children' || state === 'prioritized') {
           context.waiting += 1;
         }
-        return context;
-      },
-      { waiting: 0, delayed: 0, active: 0, available: true },
-    );
+      }
+    }
+    return context;
   } catch {
     return { waiting: 0, delayed: 0, active: 0, available: false };
   }
