@@ -1,14 +1,19 @@
 :root {
   --ink: #17201c;
   --muted: #68736d;
-  --paper: #f6f7f3;
+  --paper: #f4f6f2;
   --surface: #ffffff;
-  --line: #dfe4de;
+  --surface-subtle: #f8faf8;
+  --line: #dfe6e0;
+  --line-strong: #c8d4cb;
   --forest: #174e3a;
+  --forest-hover: #0f3d2c;
   --forest-soft: #e7f1ec;
   --amber: #d58a2a;
   --red: #b7453c;
   --blue: #426f8d;
+  --shadow-soft: 0 8px 24px rgb(26 51 38 / 6%);
+  --shadow-card: 0 18px 48px rgb(26 51 38 / 8%);
   color-scheme: light;
 }
 
@@ -31,6 +36,7 @@ body {
     BlinkMacSystemFont,
     'Segoe UI',
     sans-serif;
+  line-height: 1.5;
 }
 button,
 input,
@@ -47,6 +53,7 @@ textarea:focus-visible,
 select:focus-visible {
   outline: 3px solid rgb(23 78 58 / 25%);
   outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgb(255 255 255 / 85%);
 }
 h1,
 h2,
@@ -71,6 +78,7 @@ p {
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.14em;
+  line-height: 1.2;
   text-transform: uppercase;
 }
 .brand-mark {
@@ -79,12 +87,12 @@ p {
   width: 3.2rem;
   height: 3.2rem;
   border-radius: 1rem;
-  background: var(--forest);
+  background: linear-gradient(145deg, #1e6449, var(--forest));
   color: white;
   font-family: Georgia, serif;
   font-size: 1.15rem;
   font-weight: 700;
-  box-shadow: 0 12px 30px rgb(23 78 58 / 22%);
+  box-shadow: 0 12px 30px rgb(23 78 58 / 18%);
 }
 .brand-mark.small {
   width: 2.5rem;
@@ -141,7 +149,7 @@ p {
   border: 1px solid var(--line);
   border-radius: 1.5rem;
   background: rgb(255 255 255 / 88%);
-  box-shadow: 0 28px 80px rgb(35 49 41 / 12%);
+  box-shadow: var(--shadow-card);
   backdrop-filter: blur(16px);
 }
 .auth-card h2 {
@@ -163,19 +171,24 @@ input,
 textarea,
 select {
   width: 100%;
-  border: 1px solid #cad2cc;
+  border: 1px solid var(--line-strong);
   border-radius: 0.65rem;
-  background: white;
+  background: var(--surface);
   color: var(--ink);
   padding: 0.8rem 0.9rem;
   transition:
-    border 0.2s,
-    box-shadow 0.2s;
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
 }
 input:hover,
 textarea:hover,
 select:hover {
   border-color: #8fa096;
+}
+input::placeholder,
+textarea::placeholder {
+  color: #8a958f;
 }
 textarea {
   resize: vertical;
@@ -188,6 +201,12 @@ textarea {
   border: 0;
   border-radius: 0.65rem;
   font-weight: 750;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease;
 }
 .primary-button {
   padding: 0.82rem 1rem;
@@ -196,11 +215,17 @@ textarea {
   box-shadow: 0 8px 22px rgb(23 78 58 / 18%);
 }
 .primary-button:hover {
-  background: #0f3d2c;
+  background: var(--forest-hover);
+  box-shadow: 0 10px 26px rgb(23 78 58 / 24%);
+  transform: translateY(-1px);
+}
+.primary-button:active {
+  transform: translateY(0);
 }
 .primary-button:disabled {
   opacity: 0.55;
   cursor: wait;
+  transform: none;
 }
 .primary-button.compact {
   width: auto;
@@ -208,9 +233,14 @@ textarea {
 }
 .ghost-button {
   padding: 0.65rem 0.85rem;
-  border: 1px solid var(--line);
-  background: white;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
   color: var(--ink);
+}
+.ghost-button:hover {
+  border-color: #9eafa4;
+  background: var(--surface-subtle);
+  transform: translateY(-1px);
 }
 .danger-button {
   padding: 0.65rem 0.85rem;
@@ -218,11 +248,21 @@ textarea {
   background: #fff3f2;
   color: var(--red);
 }
+.danger-button:hover {
+  border-color: #dca9a4;
+  background: #fce8e5;
+  transform: translateY(-1px);
+}
 .text-button {
   width: 100%;
   margin-top: 1rem;
   background: transparent;
   color: var(--forest);
+}
+.text-button:hover {
+  color: var(--forest-hover);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
 }
 .icon-button {
   width: 2rem;
@@ -230,11 +270,16 @@ textarea {
   background: #edf0ed;
   font-size: 1.4rem;
 }
+.icon-button:hover {
+  background: #dfe8e1;
+  transform: translateY(-1px);
+}
 .form-error {
   margin: 0;
   padding: 0.7rem 0.8rem;
+  border: 1px solid #f0cbc7;
   border-radius: 0.55rem;
-  background: #fff0ee;
+  background: #fff7f5;
   color: #8d312a;
   font-size: 0.82rem;
 }
@@ -243,8 +288,8 @@ textarea {
   padding: 0.75rem 0.85rem;
   border: 1px solid #cdd9d1;
   border-radius: 0.65rem;
-  background: #fbfcfa;
-  box-shadow: 0 12px 26px rgb(35 49 41 / 10%);
+  background: var(--surface-subtle);
+  box-shadow: var(--shadow-soft);
   color: #3b4741;
   font-size: 0.78rem;
 }
