@@ -59,6 +59,7 @@ describe('Home page', () => {
     expect(screen.getByLabelText('Email')).toBeVisible();
     expect(screen.getByLabelText('Password')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeEnabled();
+    expect(screen.queryByText('Password rules')).not.toBeInTheDocument();
   });
 
   it('clears seeded credentials when switching to registration', () => {
@@ -75,6 +76,12 @@ describe('Home page', () => {
     expect(screen.getByRole('heading', { level: 2, name: /start building tasks/i })).toBeVisible();
     expect(screen.getByLabelText('Email')).toHaveValue('');
     expect(screen.getByLabelText('Password')).toHaveValue('');
+    expect(screen.getByRole('status')).toHaveTextContent('Password rules');
+    expect(screen.getByText('Use 12 to 128 characters.')).not.toHaveClass('met');
+
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'TaskForge123!' } });
+
+    expect(screen.getByText('Use 12 to 128 characters.')).toHaveClass('met');
   });
 
   it('returns to the login form after logout clears the server session', async () => {

@@ -238,6 +238,30 @@ textarea {
   color: #8d312a;
   font-size: 0.82rem;
 }
+.password-rules-popover {
+  margin-top: -0.35rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid #cdd9d1;
+  border-radius: 0.65rem;
+  background: #fbfcfa;
+  box-shadow: 0 12px 26px rgb(35 49 41 / 10%);
+  color: #3b4741;
+  font-size: 0.78rem;
+}
+.password-rules-popover strong {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: var(--forest);
+}
+.password-rules-popover ul {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  padding-left: 1.1rem;
+}
+.password-rules-popover li.met {
+  color: var(--forest);
+}
 .demo-hint {
   margin: 1.4rem 0 0;
   padding-top: 1rem;
