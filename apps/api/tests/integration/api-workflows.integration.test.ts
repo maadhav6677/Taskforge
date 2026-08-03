@@ -6,8 +6,13 @@ import {
   disconnectDatabase,
   prisma,
 } from '../../src/infrastructure/database/prisma.js';
-import { closeTaskQueue, getTaskQueue } from '../../src/infrastructure/queue/task.queue.js';
+import {
+  closeTaskQueue,
+  getTaskQueue,
+  scopedTaskQueueContextJobLimit,
+} from '../../src/infrastructure/queue/task.queue.js';
 import { connectRedis, disconnectRedis, redis } from '../../src/infrastructure/redis/redis.js';
+import { createTaskWorker } from '../../src/modules/tasks/task.worker.js';
 
 const app = createApp();
 const allowedOrigin = 'http://localhost:3000';
@@ -37,6 +42,16 @@ const register = async (email: string): Promise<TestAgent> => {
     .send({ email, password })
     .expect(201);
   return agent;
+};
+
+const waitFor = async <T>(read: () => Promise<T>, accept: (value: T) => boolean): Promise<T> => {
+  const deadline = Date.now() + 8_000;
+  while (Date.now() < deadline) {
+    const value = await read();
+    if (accept(value)) return value;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error('Timed out waiting for asynchronous task state.');
 };
 
 beforeAll(async () => {
@@ -150,12 +165,15 @@ describe('authenticated API workflows', () => {
     ]);
     await owner.get('/api/v1/tasks?sortBy=untrustedColumn').expect(422);
 
+    const detail = await owner.get(`/api/v1/tasks/${taskId}`).expect(200);
+    const detailEtag = detail.headers.etag as string | undefined;
+    expect(detailEtag).toBeTruthy();
     csrf = await establishCsrf(owner);
     const updated = await owner
       .patch(`/api/v1/tasks/${taskId}`)
       .set('Origin', allowedOrigin)
       .set('x-csrf-token', csrf)
-      .set('If-Match', '1')
+      .set('If-Match', detailEtag!)
       .send({ title: 'Updated through the API' })
       .expect(200);
     expect(updated.body.data.task).toMatchObject({ title: 'Updated through the API', version: 2 });
@@ -175,9 +193,186 @@ describe('authenticated API workflows', () => {
       .delete(`/api/v1/tasks/${taskId}`)
       .set('Origin', allowedOrigin)
       .set('x-csrf-token', csrf)
-      .set('If-Match', '2')
+      .set('If-Match', updated.headers.etag as string)
       .expect(204);
     await owner.get(`/api/v1/tasks/${taskId}`).expect(404);
+  });
+
+  it('retries a failed task through the HTTP lifecycle with a new execution version', async () => {
+    const worker = createTaskWorker();
+    await worker.waitUntilReady();
+    try {
+      const owner = await register('retry-http@taskforge.local');
+      const csrf = await establishCsrf(owner);
+      const created = await owner
+        .post('/api/v1/tasks')
+        .set('Origin', allowedOrigin)
+        .set('x-csrf-token', csrf)
+        .send({
+          title: 'Retry through HTTP',
+          type: 'TEXT_PROCESSING',
+          input: { schemaVersion: 1, text: '[[FAIL]]' },
+          maxAttempts: 1,
+        })
+        .expect(202);
+      const taskId = created.body.data.task.id as string;
+      const readTask = async () =>
+        (await owner.get(`/api/v1/tasks/${taskId}`).expect(200)).body.data.task;
+      const failed = await waitFor(readTask, (task) => task.status === 'FAILED');
+
+      const retryCsrf = await establishCsrf(owner);
+      const retried = await owner
+        .post(`/api/v1/tasks/${taskId}/retry`)
+        .set('Origin', allowedOrigin)
+        .set('x-csrf-token', retryCsrf)
+        .set('If-Match', String(failed.version))
+        .expect(202);
+      expect(retried.body.data.task).toMatchObject({
+        status: 'PENDING',
+        executionVersion: 2,
+        attemptsMade: 0,
+      });
+
+      const retriedFailure = await waitFor(
+        readTask,
+        (task) => task.status === 'FAILED' && task.executionVersion === 2,
+      );
+      const history = await owner.get(`/api/v1/tasks/${taskId}/history`).expect(200);
+
+      expect(retriedFailure.attemptsMade).toBe(1);
+      expect(history.body.data.events).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ type: 'MANUAL_RETRY', executionVersion: 2 }),
+          expect.objectContaining({ type: 'FAILED', executionVersion: 2, attempt: 1 }),
+        ]),
+      );
+    } finally {
+      await worker.close();
+    }
+  });
+
+  it('changes the task-detail ETag when a worker completes a task', async () => {
+    const owner = await register('etag-worker-owner@taskforge.local');
+    const csrf = await establishCsrf(owner);
+    const created = await owner
+      .post('/api/v1/tasks')
+      .set('Origin', allowedOrigin)
+      .set('x-csrf-token', csrf)
+      .send({
+        title: 'ETag completion fixture',
+        type: 'TEXT_PROCESSING',
+        input: { schemaVersion: 1, text: 'refresh the completed snapshot' },
+      })
+      .expect(202);
+    const taskId = created.body.data.task.id as string;
+    const pending = await owner.get(`/api/v1/tasks/${taskId}`).expect(200);
+    const pendingEtag = pending.headers.etag as string | undefined;
+    expect(pending.body.data.task).toMatchObject({ status: 'PENDING', result: null });
+    expect(pendingEtag).toBeTruthy();
+
+    const worker = createTaskWorker();
+    await worker.waitUntilReady();
+    try {
+      await waitFor(
+        async () => (await owner.get(`/api/v1/tasks/${taskId}`).expect(200)).body.data.task,
+        (task) => task.status === 'COMPLETED',
+      );
+    } finally {
+      await worker.close();
+    }
+
+    const completed = await owner
+      .get(`/api/v1/tasks/${taskId}`)
+      .set('If-None-Match', pendingEtag!)
+      .expect(200);
+    expect(completed.headers.etag).not.toBe(pendingEtag);
+    expect(completed.body.data.task).toMatchObject({
+      status: 'COMPLETED',
+      attemptsMade: 1,
+      result: expect.objectContaining({ normalized: 'refresh the completed snapshot' }),
+    });
+  });
+
+  it('reports waiting, delayed, and active BullMQ context only for the signed-in user', async () => {
+    const owner = await register('queue-context-owner@taskforge.local');
+    const other = await register('queue-context-other@taskforge.local');
+    const ownerCsrf = await establishCsrf(owner);
+    const otherCsrf = await establishCsrf(other);
+    const scheduledAt = new Date(Date.now() + 60_000).toISOString();
+
+    await owner
+      .post('/api/v1/tasks')
+      .set('Origin', allowedOrigin)
+      .set('x-csrf-token', ownerCsrf)
+      .send({
+        title: 'Waiting queue context',
+        type: 'TEXT_PROCESSING',
+        input: { schemaVersion: 1, text: 'waiting' },
+      })
+      .expect(202);
+    const scheduledCsrf = await establishCsrf(owner);
+    await owner
+      .post('/api/v1/tasks')
+      .set('Origin', allowedOrigin)
+      .set('x-csrf-token', scheduledCsrf)
+      .send({
+        title: 'Delayed queue context',
+        type: 'TEXT_PROCESSING',
+        input: { schemaVersion: 1, text: 'delayed' },
+        scheduledAt,
+      })
+      .expect(202);
+    await other
+      .post('/api/v1/tasks')
+      .set('Origin', allowedOrigin)
+      .set('x-csrf-token', otherCsrf)
+      .send({
+        title: 'Other user queue context',
+        type: 'TEXT_PROCESSING',
+        input: { schemaVersion: 1, text: 'not visible to owner' },
+      })
+      .expect(202);
+
+    const summary = await owner.get('/api/v1/dashboard/summary').expect(200);
+    expect(summary.body.data.queue).toEqual({
+      waiting: 1,
+      delayed: 1,
+      active: 0,
+      available: true,
+    });
+  });
+
+  it('marks oversized scoped queue context unavailable instead of returning partial counts', async () => {
+    const owner = await register('queue-context-limit@taskforge.local');
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { email: 'queue-context-limit@taskforge.local' },
+    });
+    const createdAt = new Date(Date.now() - 1_000);
+    const dispatchedAt = new Date();
+    await prisma.task.createMany({
+      data: Array.from({ length: scopedTaskQueueContextJobLimit + 1 }, (_, index) => ({
+        ownerId: user.id,
+        title: `Scoped queue limit ${index}`,
+        type: 'TEXT_PROCESSING',
+        input: { schemaVersion: 1, text: 'bounded queue context' },
+        queueJobId: `queue-context-limit-${index}`,
+        createdAt,
+        updatedAt: createdAt,
+        dispatchedAt,
+      })),
+    });
+
+    const summary = await owner.get('/api/v1/dashboard/summary').expect(200);
+    expect(summary.body.data.counts).toMatchObject({
+      total: scopedTaskQueueContextJobLimit + 1,
+      pending: scopedTaskQueueContextJobLimit + 1,
+    });
+    expect(summary.body.data.queue).toEqual({
+      waiting: 0,
+      delayed: 0,
+      active: 0,
+      available: false,
+    });
   });
 
   it('stores verified files privately and conceals downloads from other users', async () => {

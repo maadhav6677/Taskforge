@@ -132,14 +132,14 @@ docs/                       authoritative engineering documentation
 | task worker                    | Runtime job validation, conditional claim, executor choice, retry/final result |
 | `FileStorage`                  | Magic-byte verification and opaque private byte operations                     |
 | `FileRepository`               | Attachment metadata and owner-scoped lookup                                    |
-| `TaskSummaryCache`             | Ten-second bounded cache with database fallback                                |
+| `TaskSummaryCache`             | Ten-second bounded task-count cache with database fallback                     |
 | Socket bridge                  | Verified-cookie rooms and sanitized invalidation events                        |
 
 Controllers/routes translate HTTP only: Zod input, service call, status/header/envelope. Services own use cases. Repositories own persistence. Executors accept validated persisted input and return JSON-safe results.
 
 ### Data and concurrency details
 
-- `tasks.row_version` backs `If-Match`; update/delete/retry use owner, ID, expected version, allowed status, and `deleted_at IS NULL` in one predicate.
+- `tasks.row_version` backs `If-Match` and contributes to the task-detail `ETag` alongside the snapshot's last-modified timestamp. Every durable task state or result change, including worker transitions, advances it; update/delete/retry also use owner, ID, expected version, allowed status, and `deleted_at IS NULL` in one predicate.
 - `execution_version` changes only on manual retry and is embedded in job identity.
 - Persisted task input and result objects carry `schemaVersion: 1`; shared runtime contracts normalize
   accepted task input before persistence and reject unsupported versions. Attachment metadata remains
@@ -165,7 +165,7 @@ Controllers/routes translate HTTP only: Zod input, service call, status/header/e
 | Client global state | Redux Toolkit         | create panel and selected task            |
 | Local form state    | React Hook Form       | credentials and task draft                |
 
-The API client sends credentials, obtains CSRF before mutations, performs one single-flight refresh and one replay after an access `401`, and never stores tokens. Socket events invalidate queries; interval/refocus fetches preserve correctness when realtime is absent.
+The API client sends credentials, obtains CSRF before mutations, performs one single-flight refresh and one replay after an access `401`, and never stores tokens. Socket events invalidate queries; selected active task detail/history poll at a bounded interval, and list/dashboard interval/refocus fetches preserve correctness when realtime is absent. Dashboard queue context reads at most 50 of the caller's active job IDs in batches of 10; it reports unavailable rather than returning partial counts above that limit. Admin queue context is global.
 
 ### Failure mapping
 

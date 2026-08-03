@@ -88,7 +88,9 @@ Events are product concepts, not raw BullMQ event names.
 - `execution_version` starts at 1 and increments when replacing current execution through reschedule/manual retry.
 - `attempts_made >= 0`; bounded positive `max_attempts`, default 3.
 - Nullable unique deterministic `queue_job_id`, plus dispatch/lifecycle timestamps.
-- `row_version >= 1` increments on accepted browser-facing mutation.
+- `row_version >= 1` increments whenever the user-visible task state or result changes, including
+  worker lifecycle transitions. It supports browser mutation preconditions and the task-detail
+  HTTP `ETag`.
 - Nullable `deleted_at` provides soft deletion.
 
 The migration bounds titles to 160 characters, descriptions to 2,000 characters, attempts to
@@ -140,8 +142,8 @@ require a demonstrated query and consideration of write/storage cost.
 ## Transaction boundaries
 
 - **Create:** task, attachment metadata, and `CREATED` event commit together; file/database failure uses compensation. Queue dispatch occurs after commit.
-- **Claim:** conditional update requires matching task ID, execution version, pending state, and non-deleted row; zero rows means do not execute.
-- **Finalize/retry delay:** snapshot and event change together, requiring the matching processing execution.
+- **Claim:** conditional update requires matching task ID, execution version, pending state, and non-deleted row; zero rows means do not execute. The changed snapshot advances its row version.
+- **Finalize/retry delay:** snapshot and event change together, requiring the matching processing execution and advancing the row version.
 - **Reschedule/manual retry:** check expected row/lifecycle, increment execution and row versions, reset execution fields, append event; dispatch after commit.
 - **Delete:** check version/state, soft-delete and append event; stale queue delivery remains harmless because claim excludes deleted rows.
 
@@ -149,7 +151,7 @@ The product transition policy is authoritative in [requirements.md](requirements
 
 ## Concurrency and dispatch
 
-Browser mutations use returned task `version` through `If-Match`; repository writes include the expected `row_version`. Workers use `execution_version` to reject stale jobs.
+Browser mutations use the returned task `version` or task-detail `ETag` through `If-Match`; repository writes include the expected `row_version`. The task-detail `ETag` incorporates this version and the snapshot's last-modified timestamp, so every durable snapshot change invalidates a browser-cached detail, including existing rows that predate the versioning policy. Workers use `execution_version` to reject stale jobs.
 
 Reconciliation reads bounded batches of current pending undispatched rows, adds deterministic jobs with remaining delay, and conditionally records dispatch. BullMQ job uniqueness and worker claim are separate duplicate guards. See [architecture.md](architecture.md).
 
@@ -170,9 +172,10 @@ The committed initial migration history is deliberately split:
 2. `20260802130100_pg_trgm_search` explicitly enables `pg_trgm` and creates the search indexes.
 
 `pnpm db:migrate` uses `prisma migrate deploy`; `db push` is not part of the workflow. The seed uses
-fixed UUIDs and timestamps, upserts the two users and four task snapshots, and inserts missing
-history events without mutating existing history. Running it repeatedly preserves the verified
-2-user, 4-task, 15-event result.
+fixed UUIDs and timestamps, creates the two users and four task snapshots only when absent, and
+inserts missing history events without mutating existing history. Running it repeatedly never
+resets a task that a worker has already progressed; a completed fixture therefore remains
+consistent with its retained history rather than being restored to `PENDING`.
 
 ## Integration verification
 

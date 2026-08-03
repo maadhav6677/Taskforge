@@ -47,12 +47,7 @@ const seedUsers = async (database: Prisma.TransactionClient): Promise<void> => {
       createdAt: dates.userCreated,
       updatedAt: dates.userCreated,
     },
-    update: {
-      email: 'user@taskforge.local',
-      passwordHash: DEVELOPMENT_PASSWORD_HASH,
-      role: 'USER',
-      updatedAt: dates.userCreated,
-    },
+    update: {},
   });
 
   await database.user.upsert({
@@ -65,12 +60,7 @@ const seedUsers = async (database: Prisma.TransactionClient): Promise<void> => {
       createdAt: dates.userCreated,
       updatedAt: dates.userCreated,
     },
-    update: {
-      email: 'admin@taskforge.local',
-      passwordHash: DEVELOPMENT_PASSWORD_HASH,
-      role: 'ADMIN',
-      updatedAt: dates.userCreated,
-    },
+    update: {},
   });
 };
 
@@ -165,14 +155,9 @@ const seedTasks = async (database: Prisma.TransactionClient): Promise<void> => {
         maxAttempts: 3,
         rowVersion: 1,
       },
-      update: {
-        ...task,
-        ownerId: SEED_IDS.user,
-        type: 'TEXT_PROCESSING',
-        executionVersion: 1,
-        maxAttempts: 3,
-        rowVersion: 1,
-      },
+      // Existing tasks are durable product data. Re-running the seed may add only missing
+      // fixtures; overwriting a completed snapshot would contradict its append-only history.
+      update: {},
     });
   }
 };

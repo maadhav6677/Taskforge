@@ -14,6 +14,11 @@ import { FileStorage } from '../files/file.storage.js';
 import { redis } from '../../infrastructure/redis/redis.js';
 import { TaskSummaryCache } from '../../infrastructure/cache/task-summary.cache.js';
 import { publishTaskStatus } from '../../infrastructure/realtime/task-events.js';
+import type { JsonObject } from './task.repository.js';
+
+export interface TaskWorkerOptions {
+  executeTextTask?: (input: unknown) => JsonObject;
+}
 
 const emitTaskStatus = async (
   ownerId: string,
@@ -33,7 +38,10 @@ const emitTaskStatus = async (
   ]);
 };
 
-export const createTaskWorker = (tasks = new TaskRepository(prisma)) =>
+export const createTaskWorker = (
+  tasks = new TaskRepository(prisma),
+  options: TaskWorkerOptions = {},
+) =>
   new Worker<TaskJob>(
     taskQueueName,
     async (job: Job<TaskJob>) => {
@@ -51,7 +59,7 @@ export const createTaskWorker = (tasks = new TaskRepository(prisma)) =>
       try {
         let result;
         if (task.type === 'TEXT_PROCESSING') {
-          result = executeTextTask(task.input);
+          result = (options.executeTextTask ?? executeTextTask)(task.input);
         } else {
           const files = new FileRepository(prisma);
           const storage = new FileStorage();

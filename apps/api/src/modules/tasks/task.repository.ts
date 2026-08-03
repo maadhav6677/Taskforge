@@ -86,6 +86,15 @@ export interface TaskStatusCounts {
   failed: number;
 }
 
+export interface TaskQueueJob {
+  queueJobId: string;
+}
+
+export interface TaskQueueJobList {
+  jobs: TaskQueueJob[];
+  hasMore: boolean;
+}
+
 const toTaskRecord = (task: Task): TaskRecord => ({
   id: task.id,
   ownerId: task.ownerId,
@@ -232,6 +241,25 @@ export class TaskRepository {
       processing,
       completed,
       failed,
+    };
+  }
+
+  public async listQueueJobs(ownerId: string, limit: number): Promise<TaskQueueJobList> {
+    const tasks = await this.database.task.findMany({
+      where: {
+        deletedAt: null,
+        queueJobId: { not: null },
+        status: { in: ['PENDING', 'PROCESSING'] },
+        ownerId,
+      },
+      select: { queueJobId: true },
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      take: limit + 1,
+    });
+
+    return {
+      jobs: tasks.slice(0, limit).flatMap(({ queueJobId }) => (queueJobId ? [{ queueJobId }] : [])),
+      hasMore: tasks.length > limit,
     };
   }
 
@@ -437,6 +465,7 @@ export class TaskRepository {
           status: 'PROCESSING',
           attemptsMade: attempt,
           startedAt,
+          rowVersion: { increment: 1 },
         },
       });
 
@@ -480,6 +509,7 @@ export class TaskRepository {
           status: 'COMPLETED',
           result,
           completedAt,
+          rowVersion: { increment: 1 },
         },
       });
 
@@ -518,8 +548,20 @@ export class TaskRepository {
       const update = await transaction.task.updateMany({
         where: { id: taskId, executionVersion, status: 'PROCESSING', deletedAt: null },
         data: retryable
-          ? { status: 'PENDING', startedAt: null, errorCode: null, errorMessage: null }
-          : { status: 'FAILED', failedAt: occurredAt, errorCode, errorMessage },
+          ? {
+              status: 'PENDING',
+              startedAt: null,
+              errorCode: null,
+              errorMessage: null,
+              rowVersion: { increment: 1 },
+            }
+          : {
+              status: 'FAILED',
+              failedAt: occurredAt,
+              errorCode,
+              errorMessage,
+              rowVersion: { increment: 1 },
+            },
       });
       if (update.count === 0) return null;
       const task = await transaction.task.findUniqueOrThrow({ where: { id: taskId } });

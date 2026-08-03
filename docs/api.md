@@ -73,7 +73,7 @@ Codes are stable identifiers; validation `details` are optional and field-safe.
 
 | Method   | Path                  | Purpose                                 | Success |
 | -------- | --------------------- | --------------------------------------- | ------: |
-| `GET`    | `/dashboard/summary`  | Owned counts, recent/queue context      |   `200` |
+| `GET`    | `/dashboard/summary`  | Owned counts and current queue context  |   `200` |
 | `POST`   | `/tasks`              | Create immediate/scheduled task         |   `202` |
 | `GET`    | `/tasks`              | Search/filter/sort/paginate owned tasks |   `200` |
 | `GET`    | `/tasks/:id`          | Task/result/attachment metadata         |   `200` |
@@ -138,12 +138,27 @@ bytes remain available only through the separately authorized download route.
 
 Unknown fields are rejected and all sorts add an ID tie-breaker. Metadata returns page, page size, total items, and total pages.
 
+## Dashboard queue context
+
+Dashboard summaries return durable task counts plus `queue`, containing `waiting`, `delayed`,
+and `active` BullMQ job counts. A user summary resolves only the caller's current job IDs, with a
+maximum of 50 job IDs and batches of 10 Redis reads; the admin summary reports the global queue.
+`available: false` means an exact queue context could not be returned, either because Redis/BullMQ
+could not be read or because the caller exceeded the scoped limit. PostgreSQL-backed task counts
+remain available in both cases.
+
 ## Concurrency and lifecycle
 
-Task resources expose integer `version`. Update, delete, and retry require `If-Match`; mismatch returns `409 TASK_VERSION_CONFLICT`. Matching versions do not bypass lifecycle rules in [requirements.md](requirements.md).
+Task resources expose integer `version`. It advances whenever the durable task snapshot changes.
+The task-detail `ETag` incorporates that version and the snapshot's last-modified timestamp, so a
+cached detail response is revalidated after worker transitions, including records created before
+the current versioning policy. Update, delete, and retry accept either the current numeric version
+or the task-detail `ETag` in `If-Match`; stale preconditions return `409 TASK_VERSION_CONFLICT`.
+Matching versions do not bypass lifecycle rules in
+[requirements.md](requirements.md).
 
 Representative codes include `TASK_NOT_FOUND`, `TASK_INVALID_TRANSITION`, `TASK_RETRY_NOT_ALLOWED`, `TASK_VERSION_CONFLICT`, `VALIDATION_FAILED`, `CSRF_INVALID`, `FORBIDDEN`, `RATE_LIMITED`, and `SERVICE_UNAVAILABLE`.
 
 ## Live status
 
-Authenticated Socket.IO event `task.status.changed` contains only `taskId`, `status`, `executionVersion`, and `occurredAt`. It is an invalidation hint, not durable state. The client refetches affected task/history/list/dashboard queries, including after reconnect.
+Authenticated Socket.IO event `task.status.changed` contains only `taskId`, `status`, `executionVersion`, and `occurredAt`. It is an invalidation hint, not durable state. The client refetches affected task/history/list/dashboard queries, including after reconnect. Selected pending or processing task detail/history also refetch at a bounded interval, so a completion that occurs before a detail subscription is established still converges on canonical state.

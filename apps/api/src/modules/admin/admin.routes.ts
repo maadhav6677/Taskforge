@@ -7,6 +7,7 @@ import { TaskRepository } from '../tasks/task.repository.js';
 import { serializeTask } from '../tasks/task.routes.js';
 import { redis } from '../../infrastructure/redis/redis.js';
 import { TaskSummaryCache } from '../../infrastructure/cache/task-summary.cache.js';
+import { getTaskQueueContext } from '../../infrastructure/queue/task.queue.js';
 
 const paginationSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -21,7 +22,8 @@ export const createAdminRouter = () => {
   router.get('/dashboard/summary', async (req, res) => {
     const counts = (await cache.get()) ?? (await tasks.getStatusCounts());
     await cache.set(counts);
-    res.json(toSuccessResponse(req, { counts }));
+    const queue = await getTaskQueueContext();
+    res.json(toSuccessResponse(req, { counts, queue }));
   });
   router.get('/tasks', async (req, res) => {
     const query = paginationSchema.parse(req.query);
