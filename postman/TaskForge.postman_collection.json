@@ -2,24 +2,140 @@
   "info": {
     "_postman_id": "bb3ace20-f99d-4ebc-82d9-e373aa3916ef",
     "name": "TaskForge API",
-    "description": "Cookie-authenticated TaskForge smoke workflow. Run CSRF before mutations; no bearer or refresh token is stored in this collection.",
+    "description": "Comprehensive cookie-authenticated verification workflow. Run requests in order against a freshly migrated and seeded local stack. Authentication remains in Postman's cookie jar; only workflow identifiers, versions, the CSRF value, and the local upload path are collection variables. Set filePath to a valid local PNG, JPEG, WebP, or PDF before running the file-upload request (the automated verification supplies a temporary PNG).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:4000" },
     { "key": "apiBase", "value": "/api/v1" },
-    { "key": "csrfToken", "value": "" }
+    { "key": "csrfToken", "value": "" },
+    { "key": "registeredEmail", "value": "" },
+    { "key": "taskId", "value": "" },
+    { "key": "taskVersion", "value": "" },
+    { "key": "scheduledTaskId", "value": "" },
+    { "key": "scheduledTaskVersion", "value": "" },
+    { "key": "updatedScheduledTaskVersion", "value": "" },
+    { "key": "failedTaskId", "value": "aaaaaaaa-0004-4000-8000-000000000004" },
+    { "key": "failedTaskVersion", "value": "" },
+    { "key": "attachmentId", "value": "" },
+    { "key": "fileTaskId", "value": "" },
+    { "key": "filePath", "value": "" },
+    { "key": "outsiderEmail", "value": "" }
   ],
   "item": [
     {
-      "name": "01 - Establish CSRF",
+      "name": "01 - Liveness",
+      "request": { "method": "GET", "url": "{{baseUrl}}{{apiBase}}/health/live" },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('API process is live', () => pm.response.to.have.status(200));",
+              "pm.test('Liveness reports unchecked dependencies', () => { const body = pm.response.json(); pm.expect(body).to.have.property('requestId'); pm.expect(body.data.status).to.equal('alive'); pm.expect(body.data.dependencies).to.deep.equal({ redis: 'unchecked', postgres: 'unchecked', queue: 'unchecked' }); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Readiness",
+      "request": { "method": "GET", "url": "{{baseUrl}}{{apiBase}}/health/ready" },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Dependencies are ready', () => pm.response.to.have.status(200));",
+              "pm.test('Readiness identifies PostgreSQL and Redis', () => { const body = pm.response.json(); pm.expect(body).to.have.property('requestId'); pm.expect(body.data).to.deep.include({ status: 'ready', dependencies: { postgres: 'ok', redis: 'ok', queue: 'ok' } }); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - Establish CSRF",
       "request": { "method": "GET", "url": "{{baseUrl}}{{apiBase}}/auth/csrf" },
       "event": [
         {
           "listen": "test",
           "script": {
             "exec": [
-              "pm.test('CSRF cookie issued', () => pm.response.to.have.status(204));",
+              "pm.test('CSRF cookie is issued', () => pm.response.to.have.status(204));",
+              "pm.test('CSRF value is available for mutations', () => { const token = pm.cookies.get('tf_csrf'); pm.expect(token, 'tf_csrf cookie').to.be.a('string').and.not.empty; pm.collectionVariables.set('csrfToken', token); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - Registration",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "pm.collectionVariables.set('registeredEmail', `postman-${Date.now()}@taskforge.local`);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('User registration creates a session', () => pm.response.to.have.status(201));",
+              "pm.test('Registration returns a public USER identity', () => { const body = pm.response.json(); pm.expect(body).to.have.property('requestId'); pm.expect(body.data.user).to.include({ email: pm.collectionVariables.get('registeredEmail'), role: 'USER' }); pm.expect(body.data.user).to.have.property('id'); pm.expect(body.data.user).not.to.have.property('passwordHash'); });",
+              "pm.collectionVariables.set('csrfToken', pm.cookies.get('tf_csrf') || '');"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Origin", "value": "http://localhost:3000" },
+          { "key": "x-csrf-token", "value": "{{csrfToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{registeredEmail}}\",\n  \"password\": \"TaskForge123!\"\n}"
+        },
+        "url": "{{baseUrl}}{{apiBase}}/auth/register"
+      }
+    },
+    {
+      "name": "05 - Current registered user",
+      "request": { "method": "GET", "url": "{{baseUrl}}{{apiBase}}/auth/me" },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Registered session is restored', () => pm.response.to.have.status(200));",
+              "pm.test('Current user matches the registration', () => { const body = pm.response.json(); pm.expect(body).to.have.property('requestId'); pm.expect(body.data.user).to.include({ email: pm.collectionVariables.get('registeredEmail'), role: 'USER' }); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 - Refresh session",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Origin", "value": "http://localhost:3000" },
+          { "key": "x-csrf-token", "value": "{{csrfToken}}" }
+        ],
+        "url": "{{baseUrl}}{{apiBase}}/auth/refresh"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Refresh rotates the browser session', () => pm.response.to.have.status(200));",
+              "pm.test('Refresh confirms success without exposing a token', () => { const body = pm.response.json(); pm.expect(body).to.have.property('requestId'); pm.expect(body.data).to.deep.equal({ refreshed: true }); pm.expect(body.data).not.to.have.property('token'); });",
               "pm.collectionVariables.set('csrfToken', pm.cookies.get('tf_csrf') || '');"
             ]
           }
@@ -27,7 +143,44 @@
       ]
     },
     {
-      "name": "02 - Login",
+      "name": "07 - Logout registered user",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Origin", "value": "http://localhost:3000" },
+          { "key": "x-csrf-token", "value": "{{csrfToken}}" }
+        ],
+        "url": "{{baseUrl}}{{apiBase}}/auth/logout"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Session is revoked', () => pm.response.to.have.status(204));",
+              "pm.collectionVariables.set('csrfToken', '');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 - Establish CSRF for seeded user",
+      "request": { "method": "GET", "url": "{{baseUrl}}{{apiBase}}/auth/csrf" },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('CSRF cookie is reissued', () => pm.response.to.have.status(204));",
+              "pm.test('CSRF value is captured', () => { const token = pm.cookies.get('tf_csrf'); pm.expect(token).to.be.a('string').and.not.empty; pm.collectionVariables.set('csrfToken', token); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 - User login",
       "request": {
         "method": "POST",
         "header": [
@@ -46,19 +199,16 @@
           "listen": "test",
           "script": {
             "exec": [
-              "pm.test('Authenticated', () => pm.response.to.have.status(200));",
-              "pm.collectionVariables.set('csrfToken', pm.cookies.get('tf_csrf') || pm.collectionVariables.get('csrfToken'));"
+              "pm.test('Seeded USER authenticates', () => pm.response.to.have.status(200));",
+              "pm.test('Login returns the seeded public user', () => { const body = pm.response.json(); pm.expect(body).to.have.property('requestId'); pm.expect(body.data.user).to.include({ email: 'user@taskforge.local', role: 'USER' }); pm.expect(body.data.user).to.have.property('id'); });",
+              "pm.collectionVariables.set('csrfToken', pm.cookies.get('tf_csrf') || '');"
             ]
           }
         }
       ]
     },
     {
-      "name": "03 - Current user",
-      "request": { "method": "GET", "url": "{{baseUrl}}{{apiBase}}/auth/me" }
-    },
-    {
-      "name": "04 - Create text task",
+      "name": "10 - Create text task",
       "request": {
         "method": "POST",
         "header": [
@@ -68,7 +218,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"title\": \"Postman smoke task\",\n  \"description\": \"Created through the verified collection\",\n  \"type\": \"TEXT_PROCESSING\",\n  \"input\": { \"schemaVersion\": 1, \"text\": \"TaskForge keeps asynchronous state truthful.\" },\n  \"maxAttempts\": 3\n}"
+          "raw": "{\n  \"title\": \"Postman smoke task\",\n  \"description\": \"Created through the comprehensive collection\",\n  \"type\": \"TEXT_PROCESSING\",\n  \"input\": { \"schemaVersion\": 1, \"text\": \"TaskForge keeps asynchronous state truthful.\" },\n  \"maxAttempts\": 3\n}"
         },
         "url": "{{baseUrl}}{{apiBase}}/tasks"
       },
@@ -76,21 +226,480 @@
         {
           "listen": "test",
           "script": {
-            "exec": ["pm.test('Durably accepted', () => pm.response.to.have.status(202));"]
+            "exec": [
+              "pm.test('Text task is durably accepted', () => pm.response.to.have.status(202));",
+              "pm.test('Accepted task is pending and versioned', () => { const body = pm.response.json(); pm.expect(body).to.have.property('requestId'); pm.expect(body.data.task).to.include({ type: 'TEXT_PROCESSING', status: 'PENDING', version: 1 }); pm.expect(body.data.task).to.have.property('id'); pm.expect(body.data.attachments).to.deep.equal([]); pm.collectionVariables.set('taskId', body.data.task.id); pm.collectionVariables.set('taskVersion', String(body.data.task.version)); });"
+            ]
           }
         }
       ]
     },
     {
-      "name": "05 - List owned tasks",
-      "request": { "method": "GET", "url": "{{baseUrl}}{{apiBase}}/tasks?page=1&pageSize=20" }
+      "name": "11 - Task detail",
+      "request": { "method": "GET", "url": "{{baseUrl}}{{apiBase}}/tasks/{{taskId}}" },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Owned task detail is available', () => pm.response.to.have.status(200));",
+              "pm.test('Task detail includes a versioned snapshot and ETag', () => { const body = pm.response.json(); pm.expect(body).to.have.property('requestId'); pm.expect(body.data.task.id).to.equal(pm.collectionVariables.get('taskId')); pm.expect(body.data.task).to.have.property('version'); pm.expect(pm.response.headers.get('ETag')).to.match(/^\"\\d+-\\d+\"$/); });"
+            ]
+          }
+        }
+      ]
     },
     {
-      "name": "06 - Dashboard",
-      "request": { "method": "GET", "url": "{{baseUrl}}{{apiBase}}/dashboard/summary" }
+      "name": "12 - Task history",
+      "request": { "method": "GET", "url": "{{baseUrl}}{{apiBase}}/tasks/{{taskId}}/history" },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Task history is available', () => pm.response.to.have.status(200));",
+              "pm.test('Task history exposes append-only events', () => { const body = pm.response.json(); pm.expect(body).to.have.property('requestId'); pm.expect(body.data.events).to.be.an('array').and.not.empty; pm.expect(body.data.events[0]).to.include.keys('id', 'taskId', 'type', 'executionVersion', 'occurredAt'); });"
+            ]
+          }
+        }
+      ]
     },
     {
-      "name": "07 - Logout",
+      "name": "13 - Create scheduled task",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Origin", "value": "http://localhost:3000" },
+          { "key": "x-csrf-token", "value": "{{csrfToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Postman scheduled task\",\n  \"description\": \"Pending fixture for versioned mutation examples\",\n  \"type\": \"TEXT_PROCESSING\",\n  \"input\": { \"schemaVersion\": 1, \"text\": \"This task is deliberately scheduled far in the future.\" },\n  \"scheduledAt\": \"2099-01-15T09:00:00.000Z\",\n  \"maxAttempts\": 3\n}"
+        },
+        "url": "{{baseUrl}}{{apiBase}}/tasks"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Scheduled task is durably accepted', () => pm.response.to.have.status(202));",
+              "pm.test('Scheduled task remains pending with a future time', () => { const body = pm.response.json(); pm.expect(body).to.have.property('requestId'); pm.expect(body.data.task).to.include({ title: 'Postman scheduled task', status: 'PENDING', version: 1 }); pm.expect(new Date(body.data.task.scheduledAt).getTime()).to.be.above(Date.now()); pm.collectionVariables.set('scheduledTaskId', body.data.task.id); pm.collectionVariables.set('scheduledTaskVersion', String(body.data.task.version)); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14 - Search, filter, sort, and paginate owned tasks",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}{{apiBase}}/tasks?q=Postman%20scheduled&status=PENDING&type=TEXT_PROCESSING&scheduled=true&sortBy=scheduledAt&sortOrder=asc&page=1&pageSize=1"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Owned task list supports query controls', () => pm.response.to.have.status(200));",
+              "pm.test('List metadata and filtered scheduled task are present', () => { const body = pm.response.json(); pm.expect(body).to.have.property('requestId'); pm.expect(body.meta).to.include({ page: 1, pageSize: 1 }); pm.expect(body.meta).to.include.keys('totalItems', 'totalPages'); pm.expect(body.data.tasks).to.have.lengthOf(1); pm.expect(body.data.tasks[0]).to.include({ id: pm.collectionVariables.get('scheduledTaskId'), status: 'PENDING', type: 'TEXT_PROCESSING' }); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "15 - Dashboard",
+      "request": { "method": "GET", "url": "{{baseUrl}}{{apiBase}}/dashboard/summary" },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('User dashboard is available', () => pm.response.to.have.status(200));",
+              "pm.test('Dashboard returns durable counts and queue context', () => { const body = pm.response.json(); pm.expect(body).to.have.property('requestId'); pm.expect(body.data.counts).to.include.keys('total', 'pending', 'processing', 'completed', 'failed'); pm.expect(body.data.queue).to.include.keys('waiting', 'delayed', 'active', 'available'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "16 - Update with If-Match",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Origin", "value": "http://localhost:3000" },
+          { "key": "x-csrf-token", "value": "{{csrfToken}}" },
+          { "key": "If-Match", "value": "{{scheduledTaskVersion}}" }
+        ],
+        "body": { "mode": "raw", "raw": "{\n  \"title\": \"Postman scheduled task updated\"\n}" },
+        "url": "{{baseUrl}}{{apiBase}}/tasks/{{scheduledTaskId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Current version updates a pending task', () => pm.response.to.have.status(200));",
+              "pm.test('Update increments the row version', () => { const body = pm.response.json(); pm.expect(body).to.have.property('requestId'); pm.expect(body.data.task).to.include({ id: pm.collectionVariables.get('scheduledTaskId'), title: 'Postman scheduled task updated', status: 'PENDING', version: 2 }); pm.expect(pm.response.headers.get('ETag')).to.match(/^\"2-\\d+\"$/); pm.collectionVariables.set('updatedScheduledTaskVersion', String(body.data.task.version)); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "17 - Negative: stale If-Match",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Origin", "value": "http://localhost:3000" },
+          { "key": "x-csrf-token", "value": "{{csrfToken}}" },
+          { "key": "If-Match", "value": "{{scheduledTaskVersion}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"This must not overwrite the newer title\"\n}"
+        },
+        "url": "{{baseUrl}}{{apiBase}}/tasks/{{scheduledTaskId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Stale version is rejected', () => pm.response.to.have.status(409));",
+              "pm.test('Stale conflict has the stable error code', () => { const body = pm.response.json(); pm.expect(body).to.have.property('requestId'); pm.expect(body.error).to.include({ code: 'TASK_VERSION_CONFLICT' }); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "18 - Delete with If-Match",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          { "key": "Origin", "value": "http://localhost:3000" },
+          { "key": "x-csrf-token", "value": "{{csrfToken}}" },
+          { "key": "If-Match", "value": "{{updatedScheduledTaskVersion}}" }
+        ],
+        "url": "{{baseUrl}}{{apiBase}}/tasks/{{scheduledTaskId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Current version soft-deletes the task', () => pm.response.to.have.status(204));",
+              "pm.test('Delete response has no body', () => pm.expect(pm.response.text()).to.equal(''));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "19 - Deleted task is concealed",
+      "request": { "method": "GET", "url": "{{baseUrl}}{{apiBase}}/tasks/{{scheduledTaskId}}" },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Deleted task is no longer readable', () => pm.response.to.have.status(404));",
+              "pm.test('Concealed task uses the stable not-found code', () => { const body = pm.response.json(); pm.expect(body).to.have.property('requestId'); pm.expect(body.error).to.include({ code: 'TASK_NOT_FOUND' }); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "20 - Read seeded failed task",
+      "request": { "method": "GET", "url": "{{baseUrl}}{{apiBase}}/tasks/{{failedTaskId}}" },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Seeded failed task is available to its owner', () => pm.response.to.have.status(200));",
+              "pm.test('Fixture is eligible for a new execution', () => { const body = pm.response.json(); pm.expect(body).to.have.property('requestId'); pm.expect(body.data.task).to.include({ id: pm.collectionVariables.get('failedTaskId'), status: 'FAILED', executionVersion: 1, version: 1 }); pm.collectionVariables.set('failedTaskVersion', String(body.data.task.version)); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "21 - Failed-task retry",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Origin", "value": "http://localhost:3000" },
+          { "key": "x-csrf-token", "value": "{{csrfToken}}" },
+          { "key": "If-Match", "value": "{{failedTaskVersion}}" }
+        ],
+        "url": "{{baseUrl}}{{apiBase}}/tasks/{{failedTaskId}}/retry"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Failed task retry is accepted', () => pm.response.to.have.status(202));",
+              "pm.test('Retry starts a new pending execution', () => { const body = pm.response.json(); pm.expect(body).to.have.property('requestId'); pm.expect(body.data.task).to.include({ id: pm.collectionVariables.get('failedTaskId'), status: 'PENDING', executionVersion: 2, attemptsMade: 0, version: 2 }); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "22 - Negative: validation failure",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Origin", "value": "http://localhost:3000" },
+          { "key": "x-csrf-token", "value": "{{csrfToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"\",\n  \"type\": \"TEXT_PROCESSING\",\n  \"input\": { \"schemaVersion\": 1, \"text\": \"This request must fail validation.\" }\n}"
+        },
+        "url": "{{baseUrl}}{{apiBase}}/tasks"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Invalid task payload is rejected', () => pm.response.to.have.status(422));",
+              "pm.test('Validation error is structured and safe', () => { const body = pm.response.json(); pm.expect(body).to.have.property('requestId'); pm.expect(body.error).to.include({ code: 'VALIDATION_FAILED' }); pm.expect(body.error.details).to.be.an('array').and.not.empty; });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "23 - Negative: invalid CSRF",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Origin", "value": "http://localhost:3000" },
+          { "key": "x-csrf-token", "value": "not-the-cookie-token" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"This must not be created\",\n  \"type\": \"TEXT_PROCESSING\",\n  \"input\": { \"schemaVersion\": 1, \"text\": \"CSRF protection is enforced.\" }\n}"
+        },
+        "url": "{{baseUrl}}{{apiBase}}/tasks"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Invalid CSRF token is rejected', () => pm.response.to.have.status(403));",
+              "pm.test('CSRF error uses the stable code', () => { const body = pm.response.json(); pm.expect(body).to.have.property('requestId'); pm.expect(body.error).to.include({ code: 'CSRF_INVALID' }); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "24 - File upload",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Origin", "value": "http://localhost:3000" },
+          { "key": "x-csrf-token", "value": "{{csrfToken}}" }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "task",
+              "value": "{\"title\":\"Postman file inspection\",\"type\":\"FILE_INSPECTION\",\"input\":{\"schemaVersion\":1},\"maxAttempts\":2}",
+              "type": "text"
+            },
+            { "key": "attachments", "type": "file", "src": "{{filePath}}" }
+          ]
+        },
+        "url": "{{baseUrl}}{{apiBase}}/tasks"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Verified file task is accepted', () => pm.response.to.have.status(202));",
+              "pm.test('Upload returns safe attachment metadata', () => { const body = pm.response.json(); pm.expect(body).to.have.property('requestId'); pm.expect(body.data.task).to.include({ type: 'FILE_INSPECTION', status: 'PENDING' }); pm.expect(body.data.attachments).to.have.lengthOf(1); pm.expect(body.data.attachments[0]).to.include.keys('id', 'originalName', 'mimeType', 'sizeBytes'); pm.expect(body.data.attachments[0]).not.to.have.property('storageKey'); pm.collectionVariables.set('fileTaskId', body.data.task.id); pm.collectionVariables.set('attachmentId', body.data.attachments[0].id); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "25 - Authorized file download",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}{{apiBase}}/files/{{attachmentId}}/download"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Owner can download the private attachment', () => pm.response.to.have.status(200));",
+              "pm.test('Download uses safe private-file headers', () => { const contentType = pm.response.headers.get('Content-Type'); pm.expect(['image/png', 'image/jpeg', 'image/webp', 'application/pdf'].some((type) => contentType.startsWith(type))).to.equal(true); pm.expect(pm.response.headers.get('Content-Disposition')).to.match(/^attachment;/); pm.expect(pm.response.headers.get('X-Content-Type-Options')).to.equal('nosniff'); pm.expect(pm.response.headers.get('Cache-Control')).to.equal('private, no-store'); pm.expect(Number(pm.response.headers.get('Content-Length'))).to.be.above(0); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "26 - Establish CSRF for outsider",
+      "request": { "method": "GET", "url": "{{baseUrl}}{{apiBase}}/auth/csrf" },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('CSRF cookie is available for outsider registration', () => pm.response.to.have.status(204));",
+              "pm.test('CSRF value is captured', () => { const token = pm.cookies.get('tf_csrf'); pm.expect(token).to.be.a('string').and.not.empty; pm.collectionVariables.set('csrfToken', token); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "27 - Register outsider",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "pm.collectionVariables.set('outsiderEmail', `postman-outsider-${Date.now()}@taskforge.local`);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Outsider registration creates a separate USER session', () => pm.response.to.have.status(201));",
+              "pm.test('Outsider identity is public and distinct', () => { const body = pm.response.json(); pm.expect(body).to.have.property('requestId'); pm.expect(body.data.user).to.include({ email: pm.collectionVariables.get('outsiderEmail'), role: 'USER' }); pm.collectionVariables.set('csrfToken', pm.cookies.get('tf_csrf') || ''); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Origin", "value": "http://localhost:3000" },
+          { "key": "x-csrf-token", "value": "{{csrfToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{outsiderEmail}}\",\n  \"password\": \"TaskForge123!\"\n}"
+        },
+        "url": "{{baseUrl}}{{apiBase}}/auth/register"
+      }
+    },
+    {
+      "name": "28 - Negative: unauthorized file access",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}{{apiBase}}/files/{{attachmentId}}/download"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Other users cannot discover the attachment', () => pm.response.to.have.status(404));",
+              "pm.test('Cross-owner download is concealed', () => { const body = pm.response.json(); pm.expect(body).to.have.property('requestId'); pm.expect(body.error).to.include({ code: 'FILE_NOT_FOUND' }); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "29 - Establish CSRF for admin",
+      "request": { "method": "GET", "url": "{{baseUrl}}{{apiBase}}/auth/csrf" },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('CSRF cookie is available for admin login', () => pm.response.to.have.status(204));",
+              "pm.test('CSRF value is captured', () => { const token = pm.cookies.get('tf_csrf'); pm.expect(token).to.be.a('string').and.not.empty; pm.collectionVariables.set('csrfToken', token); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "30 - Admin login",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Origin", "value": "http://localhost:3000" },
+          { "key": "x-csrf-token", "value": "{{csrfToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"admin@taskforge.local\",\n  \"password\": \"TaskForge123!\"\n}"
+        },
+        "url": "{{baseUrl}}{{apiBase}}/auth/login"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Seeded ADMIN authenticates', () => pm.response.to.have.status(200));",
+              "pm.test('Login returns the admin role', () => { const body = pm.response.json(); pm.expect(body).to.have.property('requestId'); pm.expect(body.data.user).to.include({ email: 'admin@taskforge.local', role: 'ADMIN' }); pm.collectionVariables.set('csrfToken', pm.cookies.get('tf_csrf') || ''); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "31 - Admin dashboard",
+      "request": { "method": "GET", "url": "{{baseUrl}}{{apiBase}}/admin/dashboard/summary" },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Admin dashboard is available', () => pm.response.to.have.status(200));",
+              "pm.test('Admin dashboard returns global aggregates and queue context', () => { const body = pm.response.json(); pm.expect(body).to.have.property('requestId'); pm.expect(body.data.counts).to.include.keys('total', 'pending', 'processing', 'completed', 'failed'); pm.expect(body.data.queue).to.include.keys('waiting', 'delayed', 'active', 'available'); pm.expect(body.data.counts.total).to.be.at.least(4); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "32 - Admin global tasks",
+      "request": { "method": "GET", "url": "{{baseUrl}}{{apiBase}}/admin/tasks?page=1&pageSize=5" },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Admin global task list is available', () => pm.response.to.have.status(200));",
+              "pm.test('Admin list contains global task snapshots', () => { const body = pm.response.json(); pm.expect(body).to.have.property('requestId'); pm.expect(body.data.tasks).to.be.an('array').and.not.empty; pm.expect(body.data.tasks[0]).to.include.keys('id', 'ownerId', 'status', 'type', 'version'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "33 - Logout admin",
       "request": {
         "method": "POST",
         "header": [
@@ -104,8 +713,23 @@
           "listen": "test",
           "script": {
             "exec": [
-              "pm.test('Session revoked', () => pm.response.to.have.status(204));",
+              "pm.test('Admin session is revoked', () => pm.response.to.have.status(204));",
               "pm.collectionVariables.set('csrfToken', '');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "34 - Negative: unauthenticated task access",
+      "request": { "method": "GET", "url": "{{baseUrl}}{{apiBase}}/tasks/{{taskId}}" },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Unauthenticated requests are rejected', () => pm.response.to.have.status(401));",
+              "pm.test('Authentication error is structured', () => { const body = pm.response.json(); pm.expect(body).to.have.property('requestId'); pm.expect(body.error).to.include({ code: 'AUTH_REQUIRED' }); });"
             ]
           }
         }
