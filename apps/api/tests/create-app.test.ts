@@ -82,6 +82,14 @@ describe('TaskForge API foundation', () => {
       info: { title: 'TaskForge API' },
     });
     expect(document.body.paths).toHaveProperty('/tasks');
+    expect(document.body.paths['/dashboard/summary'].get.responses['200'].content).toEqual({
+      'application/json': {
+        schema: { $ref: '#/components/schemas/DashboardSummaryEnvelope' },
+      },
+    });
+    expect(document.body.components.parameters.IfMatch).toMatchObject({
+      schema: { type: 'string' },
+    });
 
     const docs = await request(createApp()).get('/api/v1/docs/').expect(200);
     expect(docs.headers['content-type']).toMatch(/^text\/html/);

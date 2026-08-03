@@ -6,7 +6,11 @@ import {
   disconnectDatabase,
   prisma,
 } from '../../src/infrastructure/database/prisma.js';
-import { closeTaskQueue, getTaskQueue } from '../../src/infrastructure/queue/task.queue.js';
+import {
+  closeTaskQueue,
+  getTaskQueue,
+  scopedTaskQueueContextJobLimit,
+} from '../../src/infrastructure/queue/task.queue.js';
 import { connectRedis, disconnectRedis, redis } from '../../src/infrastructure/redis/redis.js';
 import { createTaskWorker } from '../../src/modules/tasks/task.worker.js';
 
@@ -161,12 +165,15 @@ describe('authenticated API workflows', () => {
     ]);
     await owner.get('/api/v1/tasks?sortBy=untrustedColumn').expect(422);
 
+    const detail = await owner.get(`/api/v1/tasks/${taskId}`).expect(200);
+    const detailEtag = detail.headers.etag as string | undefined;
+    expect(detailEtag).toBeTruthy();
     csrf = await establishCsrf(owner);
     const updated = await owner
       .patch(`/api/v1/tasks/${taskId}`)
       .set('Origin', allowedOrigin)
       .set('x-csrf-token', csrf)
-      .set('If-Match', '1')
+      .set('If-Match', detailEtag!)
       .send({ title: 'Updated through the API' })
       .expect(200);
     expect(updated.body.data.task).toMatchObject({ title: 'Updated through the API', version: 2 });
@@ -186,7 +193,7 @@ describe('authenticated API workflows', () => {
       .delete(`/api/v1/tasks/${taskId}`)
       .set('Origin', allowedOrigin)
       .set('x-csrf-token', csrf)
-      .set('If-Match', '2')
+      .set('If-Match', updated.headers.etag as string)
       .expect(204);
     await owner.get(`/api/v1/tasks/${taskId}`).expect(404);
   });
@@ -332,6 +339,39 @@ describe('authenticated API workflows', () => {
       delayed: 1,
       active: 0,
       available: true,
+    });
+  });
+
+  it('marks oversized scoped queue context unavailable instead of returning partial counts', async () => {
+    const owner = await register('queue-context-limit@taskforge.local');
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { email: 'queue-context-limit@taskforge.local' },
+    });
+    const createdAt = new Date(Date.now() - 1_000);
+    const dispatchedAt = new Date();
+    await prisma.task.createMany({
+      data: Array.from({ length: scopedTaskQueueContextJobLimit + 1 }, (_, index) => ({
+        ownerId: user.id,
+        title: `Scoped queue limit ${index}`,
+        type: 'TEXT_PROCESSING',
+        input: { schemaVersion: 1, text: 'bounded queue context' },
+        queueJobId: `queue-context-limit-${index}`,
+        createdAt,
+        updatedAt: createdAt,
+        dispatchedAt,
+      })),
+    });
+
+    const summary = await owner.get('/api/v1/dashboard/summary').expect(200);
+    expect(summary.body.data.counts).toMatchObject({
+      total: scopedTaskQueueContextJobLimit + 1,
+      pending: scopedTaskQueueContextJobLimit + 1,
+    });
+    expect(summary.body.data.queue).toEqual({
+      waiting: 0,
+      delayed: 0,
+      active: 0,
+      available: false,
     });
   });
 

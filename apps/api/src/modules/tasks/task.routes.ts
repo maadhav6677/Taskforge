@@ -100,9 +100,9 @@ const listSchema = z
   );
 
 const parseExpectedVersion = (header: string | undefined): number => {
-  const normalized = header?.replace(/^W\//, '').replaceAll('"', '');
-  const version = Number(normalized);
-  if (!normalized || !Number.isInteger(version) || version < 1) {
+  const match = header?.trim().match(/^(?:W\/)?"?([1-9]\d*)(?:-\d+)?"?$/);
+  const version = Number(match?.[1]);
+  if (!match || !Number.isSafeInteger(version)) {
     throw new HttpError(400, 'IF_MATCH_REQUIRED', 'A valid If-Match version is required.');
   }
   return version;
