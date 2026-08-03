@@ -1,9 +1,25 @@
 node_modules/
+.pnpm-store/
+.turbo/
 dist/
 .next/
 coverage/
+*.tsbuildinfo
+*.log
 pnpm-lock.yaml
 apps/web/next-env.d.ts
+apps/api/src/generated/prisma/
+
+.env
+.env.*
+!.env.example
+
+storage/
+**/storage/
+tmp/
+**/tmp/
+uploads/
+**/uploads/
 
 # Retained long-form drafts are not repository authority.
 docs/assessment-requirements.md
