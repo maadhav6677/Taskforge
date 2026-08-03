@@ -329,12 +329,24 @@ describe('Task workspace', () => {
     );
 
     fireEvent.click(await screen.findByRole('button', { name: /inspect the release asset/i }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+    const deleteButton = await screen.findByRole('button', { name: 'Delete' });
+    deleteButton.focus();
+    fireEvent.click(deleteButton);
 
-    expect(screen.getByRole('alertdialog', { name: 'Delete this task?' })).toBeVisible();
+    const dialog = screen.getByRole('alertdialog', { name: 'Delete this task?' });
+    const cancelButton = screen.getByRole('button', { name: 'Cancel' });
+    const confirmButton = screen.getByRole('button', { name: 'Delete task' });
+    expect(dialog).toBeVisible();
+    await waitFor(() => expect(cancelButton).toHaveFocus());
     expect(apiRequestMock).not.toHaveBeenCalledWith(`/tasks/${task.id}`, expect.anything());
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    cancelButton.focus();
+    fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true });
+    expect(confirmButton).toHaveFocus();
+    fireEvent.keyDown(dialog, { key: 'Tab' });
+    expect(cancelButton).toHaveFocus();
+    fireEvent.keyDown(dialog, { key: 'Escape' });
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete' })).toHaveFocus();
   });
 
   it('retries a failed task with its current version from the detail panel', async () => {

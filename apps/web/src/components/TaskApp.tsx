@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDispatch, useSelector } from 'react-redux';
@@ -503,6 +503,8 @@ function TaskDetail({
 }) {
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const deleteTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const deleteDialogRef = useRef<HTMLElement>(null);
   const detail = useQuery({
     queryKey: ['task', taskId],
     queryFn: () => apiRequest<{ task: Task; attachments: Attachment[] }>(`/tasks/${taskId}`),
@@ -518,6 +520,13 @@ function TaskDetail({
   useEffect(() => {
     if (task) void history.refetch();
   }, [history.refetch, task?.status, task?.version]);
+  useEffect(() => {
+    if (!confirmingDelete) return;
+    deleteDialogRef.current?.querySelector<HTMLButtonElement>('[data-delete-cancel]')?.focus();
+    return () => {
+      if (deleteTriggerRef.current?.isConnected) deleteTriggerRef.current.focus();
+    };
+  }, [confirmingDelete]);
   const attachments = detail.data?.data.attachments ?? [];
   const action = useMutation({
     mutationFn: (kind: 'delete' | 'retry') => {
@@ -603,36 +612,69 @@ function TaskDetail({
       {task.errorMessage ? <p className="form-error">{task.errorMessage}</p> : null}
 
       {confirmingDelete ? (
-        <section
-          className="delete-confirmation"
-          role="alertdialog"
-          aria-modal="true"
-          aria-labelledby="delete-task-title"
-          aria-describedby="delete-task-description"
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !action.isPending)
+              setConfirmingDelete(false);
+          }}
         >
-          <h3 id="delete-task-title">Delete this task?</h3>
-          <p id="delete-task-description">
-            The task will leave your ledger. Its audit history remains retained.
-          </p>
-          <div className="button-row">
-            <button
-              type="button"
-              className="ghost-button"
-              disabled={action.isPending}
-              onClick={() => setConfirmingDelete(false)}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="danger-button"
-              disabled={action.isPending}
-              onClick={() => action.mutate('delete')}
-            >
-              {action.isPending ? 'Deleting...' : 'Delete task'}
-            </button>
-          </div>
-        </section>
+          <section
+            className="modal delete-confirmation"
+            ref={deleteDialogRef}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-task-title"
+            aria-describedby="delete-task-description"
+            onKeyDown={(event) => {
+              if (event.key === 'Escape' && !action.isPending) {
+                event.preventDefault();
+                setConfirmingDelete(false);
+                return;
+              }
+              if (event.key !== 'Tab') return;
+              const controls = Array.from(
+                event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not([disabled])'),
+              );
+              const first = controls[0];
+              const last = controls.at(-1);
+              if (!first || !last) return;
+              if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+              }
+              if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+              }
+            }}
+          >
+            <h2 id="delete-task-title">Delete this task?</h2>
+            <p id="delete-task-description">
+              The task will leave your ledger. Its audit history remains retained.
+            </p>
+            <div className="button-row">
+              <button
+                type="button"
+                className="ghost-button"
+                data-delete-cancel
+                disabled={action.isPending}
+                onClick={() => setConfirmingDelete(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="danger-button"
+                disabled={action.isPending}
+                onClick={() => action.mutate('delete')}
+              >
+                {action.isPending ? 'Deleting...' : 'Delete task'}
+              </button>
+            </div>
+          </section>
+        </div>
       ) : editing ? (
         <EditTaskForm
           key={`${task.id}:${task.version}`}
@@ -662,6 +704,7 @@ function TaskDetail({
           {task.status !== 'PROCESSING' ? (
             <button
               className="danger-button"
+              ref={deleteTriggerRef}
               disabled={action.isPending}
               onClick={() => setConfirmingDelete(true)}
             >
