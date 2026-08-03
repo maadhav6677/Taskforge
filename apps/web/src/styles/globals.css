@@ -113,19 +113,23 @@ p {
 }
 .auth-story {
   max-width: 720px;
+  padding-inline: clamp(0rem, 2vw, 2rem);
+}
+.auth-story .brand-mark {
+  margin-bottom: 2.4rem;
 }
 .auth-story h1 {
-  margin: 2rem 0 1.3rem;
-  max-width: 720px;
+  margin: 0 0 1.35rem;
+  max-width: 680px;
   font-family: Georgia, 'Times New Roman', serif;
   font-size: clamp(2.8rem, 6vw, 5.4rem);
   line-height: 0.98;
   letter-spacing: -0.045em;
 }
 .auth-story > p:not(.eyebrow) {
-  max-width: 600px;
+  max-width: 560px;
   color: var(--muted);
-  font-size: 1.12rem;
+  font-size: 1.06rem;
   line-height: 1.7;
 }
 .trust-row {
@@ -145,6 +149,7 @@ p {
 }
 .auth-card {
   width: min(100%, 480px);
+  justify-self: end;
   padding: clamp(1.8rem, 4vw, 3.2rem);
   border: 1px solid var(--line);
   border-radius: 1.5rem;
@@ -153,8 +158,14 @@ p {
   backdrop-filter: blur(16px);
 }
 .auth-card h2 {
+  margin: 0.45rem 0 1.65rem;
   font-family: Georgia, serif;
-  font-size: 2rem;
+  font-size: clamp(1.8rem, 3vw, 2.25rem);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+}
+.auth-card form {
+  gap: 1.1rem;
 }
 form {
   display: grid;
@@ -255,7 +266,8 @@ textarea {
 }
 .text-button {
   width: 100%;
-  margin-top: 1rem;
+  min-height: 2.5rem;
+  margin-top: 1.15rem;
   background: transparent;
   color: var(--forest);
 }
@@ -313,6 +325,7 @@ textarea {
   border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 0.72rem;
+  line-height: 1.5;
   text-align: center;
 }
 
@@ -1027,19 +1040,30 @@ label > small {
     display: none;
   }
   .auth-shell {
-    padding: 1rem;
+    gap: 2.5rem;
+    padding: 1.5rem 1rem 2.25rem;
   }
   .auth-story {
-    padding: 2rem 0.5rem 0;
+    padding: 1rem 0.25rem 0;
+  }
+  .auth-story .brand-mark {
+    margin-bottom: 1.8rem;
   }
   .auth-story h1 {
-    font-size: 2.8rem;
+    font-size: clamp(2.45rem, 12vw, 3.1rem);
+    line-height: 1;
+  }
+  .auth-story > p:not(.eyebrow) {
+    font-size: 0.98rem;
+    line-height: 1.6;
   }
   .trust-row {
     display: none;
   }
   .auth-card {
-    padding: 1.5rem;
+    justify-self: stretch;
+    padding: 1.35rem;
+    border-radius: 1.2rem;
   }
   .type-selector {
     grid-template-columns: 1fr;
