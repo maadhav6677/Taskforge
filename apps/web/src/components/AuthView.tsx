@@ -23,9 +23,16 @@ const registerDefaults: Credentials = {
 
 export function AuthView({ onAuthenticated }: { onAuthenticated: (user: User) => void }) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
-  const { register, handleSubmit, formState, reset } = useForm<Credentials>({
+  const [passwordRulesOpen, setPasswordRulesOpen] = useState(false);
+  const { register, handleSubmit, formState, reset, watch } = useForm<Credentials>({
     defaultValues: loginDefaults,
   });
+  const passwordValue = watch('password');
+  const passwordLengthValid = passwordValue.length >= 12 && passwordValue.length <= 128;
+  const showPasswordRules =
+    mode === 'register' &&
+    (passwordRulesOpen || (formState.submitCount > 0 && !passwordLengthValid));
+  const passwordField = register('password', { required: true, minLength: 12, maxLength: 128 });
   const mutation = useMutation({
     mutationFn: (values: Credentials) =>
       apiRequest<{ user: User }>(`/auth/${mode}`, {
@@ -38,6 +45,7 @@ export function AuthView({ onAuthenticated }: { onAuthenticated: (user: User) =>
     const nextMode = mode === 'login' ? 'register' : 'login';
     setMode(nextMode);
     reset(nextMode === 'login' ? loginDefaults : registerDefaults);
+    setPasswordRulesOpen(nextMode === 'register');
     mutation.reset();
   };
 
@@ -74,9 +82,29 @@ export function AuthView({ onAuthenticated }: { onAuthenticated: (user: User) =>
             <input
               type="password"
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              {...register('password', { required: true, minLength: 12, maxLength: 128 })}
+              aria-describedby={mode === 'register' ? 'password-rules' : undefined}
+              aria-invalid={mode === 'register' && formState.errors.password ? true : undefined}
+              {...passwordField}
+              onBlur={(event) => {
+                void passwordField.onBlur(event);
+                setPasswordRulesOpen(false);
+              }}
+              onFocus={() => {
+                if (mode === 'register') setPasswordRulesOpen(true);
+              }}
             />
           </label>
+          {showPasswordRules ? (
+            <div className="password-rules-popover" id="password-rules" role="status">
+              <strong>Password rules</strong>
+              <ul>
+                <li className={passwordLengthValid ? 'met' : undefined}>
+                  Use 12 to 128 characters.
+                </li>
+                <li>Email must be new and valid.</li>
+              </ul>
+            </div>
+          ) : null}
           {mutation.error ? (
             <p className="form-error" role="alert">
               {mutation.error.message}

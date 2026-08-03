@@ -7,11 +7,13 @@ docs/roadmap.md
 # Build and dependency artifacts
 node_modules/
 .pnpm-store/
+.turbo/
 dist/
 .next/
 coverage/
 *.tsbuildinfo
 pnpm-debug.log*
+*.log
 *.pem
 
 # Environment and runtime
@@ -19,9 +21,15 @@ pnpm-debug.log*
 .env.*
 !.env.example
 .DS_Store
+.idea/
+.vscode/
 apps/web/next-env.d.ts
 apps/api/src/generated/prisma/
 
 # Storage and temporary files
 storage/
+**/storage/
 tmp/
+**/tmp/
+uploads/
+**/uploads/
