@@ -20,21 +20,21 @@ Priorities:
 
 ## Capability status
 
-| Capability                          | State       | Readiness evidence                                                            |
-| ----------------------------------- | ----------- | ----------------------------------------------------------------------------- |
-| pnpm workspace and shared contracts | Implemented | Root install, generation, lint, typecheck, test, and build scripts            |
-| PostgreSQL schema and migrations    | Implemented | Committed migrations, constraints, indexes, deterministic seed                |
-| Authentication and sessions         | Implemented | Argon2id, access JWT, Redis refresh rotation, CSRF/CORS/RBAC tests            |
-| Task REST lifecycle                 | Implemented | CRUD, list controls, history, optimistic conflicts, admin reads, OpenAPI      |
-| Asynchronous processing             | Implemented | BullMQ worker, scheduling, retries, deterministic delivery, reconciliation    |
-| Private file inspection             | Implemented | Magic-byte validation, private storage, authorized download, SHA-256 result   |
-| User and admin web applications     | Implemented | Auth, dashboard, task workflows, history, admin read views                    |
-| Cache and live invalidation         | Implemented | Bounded cache, invalidation, authenticated Socket.IO hints, canonical refetch |
-| Reproducible local runtime          | Implemented | `.env.example`, Dockerfiles, Compose, migrations, seed, health endpoints      |
-| API developer tooling               | Implemented | Swagger/OpenAPI and secret-free Postman smoke collection                      |
-| CI quality gates                    | Implemented | Workspace checks, integration tests, and container builds in GitHub Actions   |
-| Browser E2E suite                   | Planned     | Small critical-flow Playwright suite still needed                             |
-| Managed production deployment       | Planned     | Requires persistent services, object storage, secrets, TLS, and monitoring    |
+| Capability                          | State       | Readiness evidence                                                                                                          |
+| ----------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------- |
+| pnpm workspace and shared contracts | Implemented | Root install, generation, lint, typecheck, test, and build scripts                                                          |
+| PostgreSQL schema and migrations    | Implemented | Committed migrations, constraints, indexes, deterministic seed                                                              |
+| Authentication and sessions         | Implemented | Argon2id, access JWT, Redis refresh rotation, CSRF/CORS/RBAC tests                                                          |
+| Task REST lifecycle                 | Implemented | CRUD, list controls, history, optimistic conflicts, admin reads, OpenAPI                                                    |
+| Asynchronous processing             | Implemented | BullMQ worker, delayed execution, automatic/manual retries, deterministic delivery, and reconciliation integration coverage |
+| Private file inspection             | Implemented | Magic-byte validation, private storage, authorized download, SHA-256 result                                                 |
+| User and admin web applications     | Implemented | Auth, dashboard, task workflows, history, admin read views                                                                  |
+| Cache and live invalidation         | Implemented | Bounded cache, invalidation, authenticated Socket.IO hints, canonical refetch                                               |
+| Reproducible local runtime          | Implemented | `.env.example`, Dockerfiles, Compose, migrations, seed, health endpoints                                                    |
+| API developer tooling               | Implemented | Swagger/OpenAPI and secret-free Postman smoke collection                                                                    |
+| CI quality gates                    | Implemented | Workspace checks, integration tests, and container builds in GitHub Actions                                                 |
+| Browser E2E suite                   | Planned     | Small critical-flow Playwright suite still needed                                                                           |
+| Managed production deployment       | Planned     | Requires persistent services, object storage, secrets, TLS, and monitoring                                                  |
 
 State meanings:
 

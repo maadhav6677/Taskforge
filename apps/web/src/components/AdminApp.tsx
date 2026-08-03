@@ -2,12 +2,16 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '../lib/api';
-import type { Task, User } from '../lib/types';
+import type { QueueContext, Task, User } from '../lib/types';
+import { QueueContextPanel } from './QueueContextPanel';
 
 export function AdminApp({ user, onLogout }: { user: User; onLogout: () => void }) {
   const summary = useQuery({
     queryKey: ['admin-summary'],
-    queryFn: () => apiRequest<{ counts: Record<string, number> }>('/admin/dashboard/summary'),
+    queryFn: () =>
+      apiRequest<{ counts: Record<string, number>; queue: QueueContext }>(
+        '/admin/dashboard/summary',
+      ),
   });
   const tasks = useQuery({
     queryKey: ['admin-tasks'],
@@ -48,6 +52,7 @@ export function AdminApp({ user, onLogout }: { user: User; onLogout: () => void 
           </article>
         ))}
       </section>
+      <QueueContextPanel queue={summary.data?.data.queue} label="Global queue" />
       <section className="task-panel admin-table">
         <div className="panel-heading">
           <div>

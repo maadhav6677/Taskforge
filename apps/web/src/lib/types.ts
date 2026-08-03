@@ -49,3 +49,10 @@ export interface ApiEnvelope<T> {
   requestId: string;
   meta?: { page: number; pageSize: number; totalItems: number; totalPages: number };
 }
+
+export interface QueueContext {
+  waiting: number;
+  delayed: number;
+  active: number;
+  available: boolean;
+}

@@ -134,8 +134,26 @@ describe('PostgreSQL migrations and constraints', () => {
 });
 
 describe('deterministic development seed', () => {
-  it('is idempotent and keeps each seeded snapshot consistent with its history', async () => {
+  it('adds only missing fixtures and preserves a seeded task after it executes', async () => {
     await seedDatabase(database);
+    const pendingTask = await database.task.findUniqueOrThrow({
+      where: { id: SEED_IDS.pendingTask },
+    });
+    const startedAt = new Date('2026-08-03T12:00:00.000Z');
+    const completedAt = new Date('2026-08-03T12:01:00.000Z');
+
+    await expect(
+      tasks.claimPending(pendingTask.id, pendingTask.executionVersion, 1, startedAt),
+    ).resolves.toMatchObject({ status: 'PROCESSING' });
+    await expect(
+      tasks.completeProcessing(
+        pendingTask.id,
+        pendingTask.executionVersion,
+        { schemaVersion: 1, normalized: 'seed completed safely' },
+        completedAt,
+      ),
+    ).resolves.toMatchObject({ status: 'COMPLETED' });
+
     await seedDatabase(database);
 
     const [userCount, taskCount, eventCount, seededTasks] = await Promise.all([
@@ -152,10 +170,10 @@ describe('deterministic development seed', () => {
     expect({ userCount, taskCount, eventCount }).toEqual({
       userCount: 2,
       taskCount: 4,
-      eventCount: 15,
+      eventCount: 17,
     });
     expect(seededTasks.map(({ status }) => status)).toEqual([
-      'PENDING',
+      'COMPLETED',
       'PENDING',
       'COMPLETED',
       'FAILED',
@@ -182,6 +200,11 @@ describe('deterministic development seed', () => {
     expect(seededTasks.find(({ id }) => id === SEED_IDS.failedTask)?.errorCode).toBe(
       'TEXT_PROCESSING_REJECTED',
     );
+    expect(seededTasks.find(({ id }) => id === SEED_IDS.pendingTask)).toMatchObject({
+      status: 'COMPLETED',
+      attemptsMade: 1,
+      result: { schemaVersion: 1, normalized: 'seed completed safely' },
+    });
   });
 });
 

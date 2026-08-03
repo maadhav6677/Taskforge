@@ -11,6 +11,13 @@ export const taskJobSchema = z.object({
 
 export type TaskJob = z.infer<typeof taskJobSchema>;
 
+export interface TaskQueueContext {
+  waiting: number;
+  delayed: number;
+  active: number;
+  available: boolean;
+}
+
 export const getBullConnection = () => {
   const url = new URL(env.REDIS_URL);
   const database = url.pathname.length > 1 ? Number(url.pathname.slice(1)) : 0;
@@ -40,6 +47,44 @@ export const getTaskQueue = (): Queue<TaskJob> => {
 
 export const taskJobId = (taskId: string, executionVersion: number): string =>
   `${taskId}-${executionVersion}`;
+
+export const getTaskQueueContext = async (
+  jobIds?: readonly string[],
+): Promise<TaskQueueContext> => {
+  try {
+    const queue = getTaskQueue();
+    if (jobIds === undefined) {
+      const counts = await queue.getJobCounts(
+        'waiting',
+        'waiting-children',
+        'prioritized',
+        'delayed',
+        'active',
+      );
+      return {
+        waiting: counts.waiting + counts['waiting-children'] + counts.prioritized,
+        delayed: counts.delayed,
+        active: counts.active,
+        available: true,
+      };
+    }
+
+    const states = await Promise.all(jobIds.map((jobId) => queue.getJobState(jobId)));
+    return states.reduce<TaskQueueContext>(
+      (context, state) => {
+        if (state === 'delayed') context.delayed += 1;
+        if (state === 'active') context.active += 1;
+        if (state === 'waiting' || state === 'waiting-children' || state === 'prioritized') {
+          context.waiting += 1;
+        }
+        return context;
+      },
+      { waiting: 0, delayed: 0, active: 0, available: true },
+    );
+  } catch {
+    return { waiting: 0, delayed: 0, active: 0, available: false };
+  }
+};
 
 export const closeTaskQueue = async (): Promise<void> => {
   if (!singleton) return;

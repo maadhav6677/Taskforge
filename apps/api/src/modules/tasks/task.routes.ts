@@ -280,7 +280,7 @@ export const createTaskRouter = () => {
     const task = await repository.findOwnedById(req.auth!.sub, id);
     if (!task) throw new HttpError(404, 'TASK_NOT_FOUND', 'The task was not found.');
     const attachments = await fileRepository.listForTask(task.id);
-    res.set('ETag', `"${task.version}"`).json(
+    res.set('ETag', `"${task.version}-${task.updatedAt.getTime()}"`).json(
       toSuccessResponse(req, {
         task: serializeTask(task),
         attachments: attachments.map((file) => ({
@@ -313,7 +313,7 @@ export const createTaskRouter = () => {
       );
       await summaryCache.invalidate(req.auth!.sub);
       res
-        .set('ETag', `"${task.version}"`)
+        .set('ETag', `"${task.version}-${task.updatedAt.getTime()}"`)
         .json(toSuccessResponse(req, { task: serializeTask(task) }));
     } catch (error) {
       translateTaskError(error);

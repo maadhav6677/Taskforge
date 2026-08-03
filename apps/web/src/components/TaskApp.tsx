@@ -6,9 +6,18 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDispatch, useSelector } from 'react-redux';
 import { io } from 'socket.io-client';
 import { apiAssetUrl, apiRequest } from '../lib/api';
-import type { Attachment, Task, TaskEvent, TaskStatus, TaskType, User } from '../lib/types';
+import type {
+  Attachment,
+  QueueContext,
+  Task,
+  TaskEvent,
+  TaskStatus,
+  TaskType,
+  User,
+} from '../lib/types';
 import type { RootState } from '../store/store';
 import { setCreatePanelOpen, setSelectedTaskId } from '../store/uiSlice';
+import { QueueContextPanel } from './QueueContextPanel';
 
 interface CreateValues {
   type: TaskType;
@@ -93,6 +102,16 @@ const inputText = (task: Task): string => {
   return typeof text === 'string' ? text : '';
 };
 
+const isActiveTaskStatus = (status: TaskStatus | undefined): boolean =>
+  status === 'PENDING' || status === 'PROCESSING';
+
+const taskQueueLabel = (task: Task): string => {
+  if (task.status === 'PROCESSING') return 'Active';
+  if (task.status !== 'PENDING') return 'Finished';
+  if (task.scheduledAt && new Date(task.scheduledAt).getTime() > Date.now()) return 'Scheduled';
+  return 'Waiting';
+};
+
 export function TaskApp({ user, onLogout }: { user: User; onLogout: () => void }) {
   const queryClient = useQueryClient();
   const dispatch = useDispatch();
@@ -132,7 +151,8 @@ export function TaskApp({ user, onLogout }: { user: User; onLogout: () => void }
 
   const summary = useQuery({
     queryKey: ['dashboard'],
-    queryFn: () => apiRequest<{ counts: Record<string, number> }>('/dashboard/summary'),
+    queryFn: () =>
+      apiRequest<{ counts: Record<string, number>; queue: QueueContext }>('/dashboard/summary'),
     refetchInterval: 10_000,
   });
   const tasks = useQuery({
@@ -206,6 +226,7 @@ export function TaskApp({ user, onLogout }: { user: User; onLogout: () => void }
           </article>
         ))}
       </section>
+      <QueueContextPanel queue={summary.data?.data.queue} label="Your queue" />
 
       <section className="workspace-grid">
         <div className="task-panel">
@@ -481,15 +502,22 @@ function TaskDetail({
   onDeleted: () => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const detail = useQuery({
     queryKey: ['task', taskId],
     queryFn: () => apiRequest<{ task: Task; attachments: Attachment[] }>(`/tasks/${taskId}`),
+    refetchInterval: (query) =>
+      isActiveTaskStatus(query.state.data?.data.task.status) ? 2_000 : false,
   });
+  const task = detail.data?.data.task;
   const history = useQuery({
     queryKey: ['history', taskId],
     queryFn: () => apiRequest<{ events: TaskEvent[] }>(`/tasks/${taskId}/history`),
+    refetchInterval: isActiveTaskStatus(task?.status) ? 2_000 : false,
   });
-  const task = detail.data?.data.task;
+  useEffect(() => {
+    if (task) void history.refetch();
+  }, [history.refetch, task?.status, task?.version]);
   const attachments = detail.data?.data.attachments ?? [];
   const action = useMutation({
     mutationFn: (kind: 'delete' | 'retry') => {
@@ -502,7 +530,13 @@ function TaskDetail({
         },
       );
     },
-    onSuccess: (_result, kind) => (kind === 'delete' ? onDeleted() : onChanged()),
+    onSuccess: (_result, kind) => {
+      if (kind === 'delete') {
+        setConfirmingDelete(false);
+        return onDeleted();
+      }
+      return onChanged();
+    },
   });
 
   if (detail.isLoading) return <TaskSkeleton />;
@@ -535,15 +569,19 @@ function TaskDetail({
           <dt>Scheduled</dt>
           <dd>{formatDate(task.scheduledAt)}</dd>
         </div>
+        <div>
+          <dt>Queue</dt>
+          <dd>{taskQueueLabel(task)}</dd>
+        </div>
       </dl>
       <section className="data-block">
         <h3>Input</h3>
-        <pre>{JSON.stringify(task.input, null, 2)}</pre>
+        <TaskInput task={task} attachments={attachments} />
       </section>
       {task.result ? (
         <section className="data-block success">
           <h3>Result</h3>
-          <pre>{JSON.stringify(task.result, null, 2)}</pre>
+          <TaskResult result={task.result} attachments={attachments} />
         </section>
       ) : null}
       {attachments.length > 0 ? (
@@ -564,7 +602,38 @@ function TaskDetail({
       ) : null}
       {task.errorMessage ? <p className="form-error">{task.errorMessage}</p> : null}
 
-      {editing ? (
+      {confirmingDelete ? (
+        <section
+          className="delete-confirmation"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="delete-task-title"
+          aria-describedby="delete-task-description"
+        >
+          <h3 id="delete-task-title">Delete this task?</h3>
+          <p id="delete-task-description">
+            The task will leave your ledger. Its audit history remains retained.
+          </p>
+          <div className="button-row">
+            <button
+              type="button"
+              className="ghost-button"
+              disabled={action.isPending}
+              onClick={() => setConfirmingDelete(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="danger-button"
+              disabled={action.isPending}
+              onClick={() => action.mutate('delete')}
+            >
+              {action.isPending ? 'Deleting...' : 'Delete task'}
+            </button>
+          </div>
+        </section>
+      ) : editing ? (
         <EditTaskForm
           key={`${task.id}:${task.version}`}
           task={task}
@@ -594,7 +663,7 @@ function TaskDetail({
             <button
               className="danger-button"
               disabled={action.isPending}
-              onClick={() => action.mutate('delete')}
+              onClick={() => setConfirmingDelete(true)}
             >
               Delete
             </button>
@@ -624,6 +693,136 @@ function TaskDetail({
           </div>
         ))}
       </section>
+    </div>
+  );
+}
+
+function RawData({ label, value }: { label: string; value: unknown }) {
+  return (
+    <details className="raw-data">
+      <summary>View raw {label}</summary>
+      <pre>{JSON.stringify(value, null, 2)}</pre>
+    </details>
+  );
+}
+
+function TaskInput({ task, attachments }: { task: Task; attachments: Attachment[] }) {
+  if (task.type === 'TEXT_PROCESSING') {
+    return (
+      <div className="input-summary">
+        <strong>Text to process</strong>
+        <p>{inputText(task)}</p>
+        <RawData label="input" value={task.input} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="input-summary">
+      <strong>Files to inspect</strong>
+      <p>
+        {attachments.length === 1
+          ? 'One private attachment will be inspected.'
+          : `${attachments.length} private attachments will be inspected.`}
+      </p>
+      <RawData label="input" value={task.input} />
+    </div>
+  );
+}
+
+function TaskResult({ result, attachments }: { result: unknown; attachments: Attachment[] }) {
+  if (result && typeof result === 'object' && !Array.isArray(result)) {
+    const value = result as Record<string, unknown>;
+    if (
+      typeof value.normalized === 'string' &&
+      typeof value.uppercase === 'string' &&
+      typeof value.wordCount === 'number' &&
+      typeof value.characterCount === 'number' &&
+      typeof value.sha256 === 'string'
+    ) {
+      return (
+        <div className="result-summary">
+          <dl>
+            <div>
+              <dt>Words</dt>
+              <dd>{value.wordCount}</dd>
+            </div>
+            <div>
+              <dt>Characters</dt>
+              <dd>{value.characterCount}</dd>
+            </div>
+          </dl>
+          <p>
+            <strong>Normalized text</strong>
+            <span>{value.normalized}</span>
+          </p>
+          <p>
+            <strong>Uppercase</strong>
+            <span>{value.uppercase}</span>
+          </p>
+          <p>
+            <strong>SHA-256</strong>
+            <code>{value.sha256}</code>
+          </p>
+          <RawData label="result" value={result} />
+        </div>
+      );
+    }
+    if (Array.isArray(value.files)) {
+      return (
+        <div className="result-file-summary">
+          <div className="result-file-table-wrap">
+            <table className="result-file-table">
+              <thead>
+                <tr>
+                  <th scope="col">File</th>
+                  <th scope="col">Type</th>
+                  <th scope="col">Size</th>
+                  <th scope="col">SHA-256</th>
+                </tr>
+              </thead>
+              <tbody>
+                {value.files.map((file, index) => {
+                  const item =
+                    file && typeof file === 'object' ? (file as Record<string, unknown>) : {};
+                  const attachment =
+                    typeof item.id === 'string'
+                      ? attachments.find(({ id }) => id === item.id)
+                      : undefined;
+                  return (
+                    <tr key={typeof item.id === 'string' ? item.id : index}>
+                      <th scope="row">
+                        {attachment?.originalName ?? `Verified file ${index + 1}`}
+                      </th>
+                      <td>
+                        {typeof item.mimeType === 'string'
+                          ? item.mimeType
+                          : (attachment?.mimeType ?? '-')}
+                      </td>
+                      <td>
+                        {typeof item.sizeBytes === 'number'
+                          ? formatBytes(item.sizeBytes)
+                          : attachment
+                            ? formatBytes(attachment.sizeBytes)
+                            : '-'}
+                      </td>
+                      <td>{typeof item.sha256 === 'string' ? <code>{item.sha256}</code> : '-'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <RawData label="result" value={result} />
+        </div>
+      );
+    }
+  }
+
+  return (
+    <div className="result-unknown">
+      <p>A result was produced. Open the raw data to inspect it.</p>
+      <RawData label="result" value={result} />
     </div>
   );
 }
