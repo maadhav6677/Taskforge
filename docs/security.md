@@ -1,6 +1,10 @@
 # Security design
 
-**Status:** Prototype controls implemented; complete threat matrix pending
+**Status:** Current security controls; production threat hardening remains active
+
+## Purpose and ownership
+
+This document defines TaskForge trust boundaries, authentication, authorization, input safety, private-file handling, secret management, and required security verification. Update it whenever a protected surface, credential flow, role policy, upload rule, rate limit, log field, or deployment trust boundary changes.
 
 ## Trust boundaries
 
@@ -19,7 +23,7 @@ Validate browser input, cookies/headers, HTTP payloads, multipart content, queue
 - Role/security changes revoke affected sessions.
 - Redis session loss fails closed by requiring login.
 
-No token enters localStorage, Redux, logs, API bodies, Postman exports, or video.
+No token enters localStorage, Redux, logs, API bodies, Postman exports, screenshots, or documentation examples.
 
 ## CSRF, CORS, and transport
 
@@ -81,7 +85,7 @@ Thresholds are validated configuration. Failure policy is deliberate: auth abuse
 
 - Validate environment configuration once at startup; never print values.
 - `.env.example` contains clearly marked development-only values; real deployments override them through environment/secret management.
-- Never expose secrets through `NEXT_PUBLIC_*`, images, snapshots, logs, collections, or video.
+- Never expose secrets through `NEXT_PUBLIC_*`, images, snapshots, logs, API collections, or documentation.
 - Pino logs request/service/task/job/execution identifiers and stable error codes.
 - Redact cookies, auth/CSRF headers, passwords/hashes, tokens, connection URLs, file bytes/paths, and full user payloads.
 
@@ -92,7 +96,7 @@ Thresholds are validated configuration. Failure policy is deliberate: auth abuse
 - Database, Redis, and private uploads are not public network services in production.
 - Dependency audit findings are triaged explicitly rather than ignored or blindly auto-fixed.
 
-## Required negative tests
+## Security verification
 
 - Duplicate registration, generic bad login, expiry/revocation, concurrent refresh, and replaced-token reuse.
 - Missing/invalid CSRF and disallowed origin.

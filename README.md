@@ -2,7 +2,7 @@
 
 TaskForge is a multi-user task automation and asynchronous job-processing platform. It lets users submit work now or schedule it for later, processes that work outside the HTTP request, and provides a durable status, result, and audit history for every execution.
 
-> **Deployment status:** TaskForge is not publicly deployed for this assessment. The complete product can be reproduced locally with the steps below using either local development processes or Docker Compose.
+> **Deployment status:** TaskForge currently uses a local-first runtime. The complete product can be reproduced with the steps below using either development processes or Docker Compose; a managed public environment is not configured yet.
 
 ## What problem does TaskForge solve?
 
@@ -361,6 +361,6 @@ sequenceDiagram
 - [Database design](docs/database.md)
 - [Security design](docs/security.md)
 - [Coding and test conventions](docs/coding-style.md)
-- [Delivery and submission checklist](docs/delivery.md)
+- [Engineering delivery and release readiness](docs/delivery.md)
 
-Contributors and AI agents should read [AGENTS.md](AGENTS.md) before changing the repository.
+Contributors and coding agents should read [AGENTS.md](AGENTS.md) before changing the repository.

@@ -1,6 +1,12 @@
 # API contract
 
-**Status:** Prototype implemented; OpenAPI is served at `/api/v1/openapi.json`
+**Status:** Current HTTP and realtime contract; OpenAPI is served at `/api/v1/openapi.json`
+
+## Purpose and ownership
+
+This document describes the public API behavior used by the web application and external API clients. Update it with every endpoint, status, envelope, error code, header, cookie, pagination, upload, or realtime-event change.
+
+The served OpenAPI document is the machine-readable companion to this guide. Security policy remains authoritative in [security.md](security.md), lifecycle policy in [requirements.md](requirements.md), and persistence detail in [database.md](database.md).
 
 ## Conventions
 
